@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #07090b;
+  color: #b8ccd8;
+  font-family: 'Exo 2', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #07090b !important;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.leaflet-tile-pane { filter: brightness(0.55) saturate(0.4) hue-rotate(185deg); }
+
+.leaflet-control-zoom a {
+  background: #0c1018 !important;
+  color: #4a6070 !important;
+  border-color: #1e2c3a !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #1c2530 !important;
+  color: #dceaf0 !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #0c1018;
+  border: 1px solid #1e2c3a;
+  border-radius: 2px;
+  color: #b8ccd8;
+  box-shadow: 0 4px 24px rgba(0,0,0,.6);
+}
+
+.leaflet-popup-tip { background: #1e2c3a; }
+.leaflet-popup-close-button { color: #4a6070 !important; }
+.leaflet-popup-close-button:hover { color: #dceaf0 !important; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #07090b; }
+::-webkit-scrollbar-thumb { background: #1e2c3a; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #2e3f52; }
+
+/* Transitions */
+.fade-in { animation: fadeIn .2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Pulse for active */
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
