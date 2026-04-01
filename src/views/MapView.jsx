@@ -75,7 +75,7 @@ export function MapView({ auth }) {
       </div>
 
       {/* Map */}
-      <div style={{ position: 'absolute', inset: 0, top: 37 }}>
+      <div style={{ position: 'absolute', top: 37, left: 0, right: 0, bottom: 0 }}>
         <TacticalMap
           flights={filteredFlights}
           byBase={filteredByBase}
