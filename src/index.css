@@ -16,7 +16,7 @@ body {
   font-family: 'Share Tech Mono', monospace;
 }
 
-/* tile filter removed - was too dark */
+.leaflet-tile-pane { filter: brightness(0.8) saturate(0.55); }
 
 .leaflet-control-zoom a {
   background: #0c1018 !important;
