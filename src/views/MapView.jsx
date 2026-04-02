@@ -252,7 +252,7 @@ export function MapView({ auth }) {
       <div style={{position:'relative',overflow:'hidden'}}>
         <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png"
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             subdomains="abcd" maxZoom={18}
           />
           <FlyTo target={flyTarget} />
@@ -507,7 +507,7 @@ function ADetail({asset,onExpand,flights}) {
             {bf.slice(0,6).map(f=>(
               <div key={f.id} style={{display:'flex',gap:6,marginBottom:5,...Z,fontSize:10}}>
                 <span style={{color:C.t3,width:30}}>{f.dep_date?.slice(5)||'—'}</span>
-                <span style={{color:C.tb,width:56,fontWeight:600}}>{f.callsign}</span>
+                <span style={{color:C.tb,width:56,fontWeight:600}}>{normCallsign(f.callsign)}</span>
                 <span style={{color:f.mc_flag==='socom'?C.p:C.t1,flex:1,fontSize:9}}>{f.mission_code||'—'}</span>
                 <span style={{color:C.g,width:36}}>{f.destination}</span>
               </div>
@@ -715,27 +715,7 @@ function AbmModal({asset,flights,onClose}) {
           <FlightTable flights={tab.includes('INBOUND')?inbound:outbound} label={tab.includes('INBOUND')?'inbound':'outbound'} intel={asset.intel} />
         )}
         {tab==='AIRCRAFT'&&(
-          <div style={{padding:'14px 18px'}}>
-            {(asset.aircraftTypes||[]).map((ac,i)=>(
-              <div key={i} style={{marginBottom:10,padding:'10px 12px',background:C.bg,border:`1px solid ${C.br}`,borderRadius:1}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:ac.tails?.length>0?8:0}}>
-                  <div style={{flex:1}}>
-                    <div style={{...R,fontSize:14,fontWeight:700,color:C.tb}}>{ac.type}</div>
-                    <div style={{...R,fontSize:10,color:C.t2}}>{ac.role}</div>
-                  </div>
-                  <div style={{...Z,fontSize:18,fontWeight:700,color:C.y}}>{ac.qty}</div>
-                </div>
-                {ac.tails?.length>0&&(
-                  <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6,paddingTop:6,borderTop:`1px solid ${C.br}`}}>
-                    {ac.tails.map((t,j)=>(
-                      <span key={j} style={{...Z,fontSize:9,padding:'2px 6px',background:'rgba(80,160,232,.1)',border:`1px solid rgba(80,160,232,.2)`,color:C.b,borderRadius:1}}>{t}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            {(!asset.aircraftTypes||asset.aircraftTypes.length===0)&&<div style={{...Z,fontSize:10,color:C.t3,padding:12}}>No aircraft data on file.</div>}
-          </div>
+          <AircraftTab aircraftTypes={asset.aircraftTypes} />
         )}
         {tab==='INTEL'&&(
           <div style={{padding:'14px 18px',...Z,fontSize:10,color:C.t1,lineHeight:1.8}}>
@@ -747,46 +727,181 @@ function AbmModal({asset,flights,onClose}) {
   )
 }
 
+// ── Aircraft category grouping ────────────────────────────
+const AC_CATEGORIES = {
+  'Strategic Bomber': { icon:'💣', color:'#e85040', order:1 },
+  'Fighter':          { icon:'⚡', color:'#e85040', order:2 },
+  'Strike':           { icon:'🎯', color:'#f0a040', order:3 },
+  'EW':               { icon:'📡', color:'#a060e8', order:4 },
+  'AEW&C':            { icon:'👁', color:'#50a0e8', order:5 },
+  'ISR':              { icon:'🔭', color:'#50a0e8', order:6 },
+  'Tanker':           { icon:'⛽', color:'#39e0a0', order:7 },
+  'SOCOM Airlift':    { icon:'🔒', color:'#a060e8', order:8 },
+  'SOCOM Assault/Infiltration':{ icon:'🔒', color:'#a060e8', order:8 },
+  'Gunship':          { icon:'💥', color:'#e85040', order:9 },
+  'Strategic Airlift':{ icon:'✈', color:'#4a6070', order:10 },
+}
+
+function AircraftTab({ aircraftTypes }) {
+  const [expanded, setExpanded] = useState(null)
+
+  if (!aircraftTypes?.length) return (
+    <div style={{padding:20,...Z,fontSize:10,color:C.t3}}>No deployed aircraft data on file for this base.</div>
+  )
+
+  // Group by category, filter out pure cargo (only show if category isn't just "Strategic Airlift" for cargo bases)
+  const grouped = {}
+  aircraftTypes.forEach((ac, i) => {
+    const role = ac.role || 'Other'
+    // Determine category key
+    let cat = 'Other'
+    if (role.includes('Bomber')) cat = 'Strategic Bomber'
+    else if (role.includes('Fighter')) cat = 'Fighter'
+    else if (role.includes('Strike')) cat = 'Strike'
+    else if (role.includes('EW')) cat = 'EW'
+    else if (role.includes('AEW') || role.includes('AWACS')) cat = 'AEW&C'
+    else if (role.includes('ISR') || role.includes('Recon')) cat = 'ISR'
+    else if (role.includes('Tanker')) cat = 'Tanker'
+    else if (role.includes('Gunship')) cat = 'Gunship'
+    else if (role.includes('SOCOM') && role.includes('Assault')) cat = 'SOCOM Assault/Infiltration'
+    else if (role.includes('SOCOM')) cat = 'SOCOM Airlift'
+    else if (role.includes('Airlift')) cat = 'Strategic Airlift'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push({ ...ac, _idx: i })
+  })
+
+  const sortedCats = Object.entries(grouped).sort((a,b) =>
+    (AC_CATEGORIES[a[0]]?.order||99) - (AC_CATEGORIES[b[0]]?.order||99)
+  )
+
+  return (
+    <div style={{padding:'14px 18px'}}>
+      <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:12}}>
+        DEPLOYED AIRCRAFT — click category or type for individual airframes
+      </div>
+      {sortedCats.map(([cat, acs]) => {
+        const meta = AC_CATEGORIES[cat] || { icon:'✈', color:C.t2 }
+        const isOpen = expanded === cat
+        return (
+          <div key={cat} style={{marginBottom:8}}>
+            {/* Category header */}
+            <div onClick={() => setExpanded(isOpen ? null : cat)}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
+                background:isOpen?`${meta.color}18`:C.bg3,
+                border:`1px solid ${isOpen?meta.color+'60':C.br}`,
+                borderRadius:1,cursor:'pointer'}}>
+              <span style={{fontSize:16}}>{meta.icon}</span>
+              <span style={{...R,fontSize:13,fontWeight:700,color:C.tb,flex:1}}>{cat}</span>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <span style={{...Z,fontSize:11,color:meta.color,fontWeight:700}}>
+                  {acs.length} type{acs.length>1?'s':''}
+                </span>
+                <span style={{...Z,fontSize:9,color:C.t2}}>{isOpen?'▲':'▼'}</span>
+              </div>
+            </div>
+            {/* Expanded: individual aircraft types */}
+            {isOpen && (
+              <div style={{border:`1px solid ${meta.color}40`,borderTop:'none',background:'rgba(0,0,0,.2)'}}>
+                {acs.map((ac, j) => (
+                  <AircraftTypeRow key={j} ac={ac} color={meta.color} />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AircraftTypeRow({ ac, color }) {
+  const [showTails, setShowTails] = useState(false)
+  return (
+    <div style={{borderBottom:`1px solid rgba(30,44,58,.4)`}}>
+      <div onClick={() => ac.tails?.length && setShowTails(v=>!v)}
+        style={{display:'flex',alignItems:'center',gap:12,padding:'8px 16px',
+          cursor:ac.tails?.length?'pointer':'default',
+          background:showTails?'rgba(80,160,232,.06)':'transparent'}}>
+        <div style={{flex:1}}>
+          <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{ac.type}</div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{...Z,fontSize:16,fontWeight:700,color:color,lineHeight:1}}>{ac.qty}</div>
+          {ac.tails?.length>0&&(
+            <div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>
+              {showTails?'▲ hide':'▼ '+ ac.tails.length +' airframes'}
+            </div>
+          )}
+        </div>
+      </div>
+      {showTails && ac.tails?.length>0&&(
+        <div style={{padding:'8px 16px 12px',background:'rgba(80,160,232,.04)'}}>
+          <div style={{...R,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:6}}>CONFIRMED TAIL NUMBERS / CALLSIGNS</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+            {ac.tails.map((t,k)=>(
+              <span key={k} style={{...Z,fontSize:9,padding:'2px 6px',background:'rgba(80,160,232,.1)',border:`1px solid rgba(80,160,232,.2)`,color:C.b,borderRadius:1}}>{t}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Normalise callsign: "REACH 1234" / "REACH1234" → "RCH1234"
+function normCallsign(cs) {
+  if (!cs) return '—'
+  return cs.replace(/^REACH\s*/i, 'RCH').toUpperCase()
+}
+
 function FlightTable({flights,label,intel}) {
   if(!flights.length) return (
-    <div style={{padding:20,...Z,fontSize:10,color:C.t3}}>
+    <div style={{padding:20,...Z,fontSize:10,color:C.t3,whiteSpace:'pre-line'}}>
       No {label} flight records currently matched.{intel?`\n\n${intel}`:''}
     </div>
   )
   return (
     <div>
       <div style={{padding:'6px 12px',background:C.bg4,borderBottom:`1px solid ${C.br}`,...Z,fontSize:9,color:C.t2}}>
-        {flights.length} {label} flights tracked
+        ← {flights.length} {label} tracked · ORIGIN codes = ICAO departure base · HEX = ICAO Mode-S transponder
       </div>
-      <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
-        <thead>
-          <tr style={{background:C.bg4}}>
-            {['DATE','CALLSIGN','MISSION CODE','ORIGIN','TYPE','VIA','STATUS'].map(h=>(
-              <th key={h} style={{...R,fontSize:9,fontWeight:600,letterSpacing:2,color:C.t2,padding:'6px 9px',borderBottom:`1px solid ${C.br}`,textAlign:'left'}}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {flights.map(f=>{
-            const isSocom=f.mc_flag==='socom'
-            return (
-              <tr key={f.id} style={{borderBottom:`1px solid rgba(30,44,58,.4)`}}>
-                <td style={{padding:'5px 9px',...Z,color:C.t3,fontSize:10}}>{f.dep_date?.slice(5)||'—'}</td>
-                <td style={{padding:'5px 9px',...R,fontWeight:700,color:C.tb,fontSize:12}}>{f.callsign}</td>
-                <td style={{padding:'5px 9px',...Z,fontSize:10,color:C.t1}}>{f.mission_code||f.notes?.split(' ').slice(0,3).join(' ')||'—'}</td>
-                <td style={{padding:'5px 9px',...Z,color:C.b,fontSize:10}}>{f.base||'—'}</td>
-                <td style={{padding:'5px 9px'}}>
-                  <span style={{...R,fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:1,background:isSocom?'rgba(160,96,232,.15)':'rgba(80,160,232,.12)',border:`1px solid ${isSocom?'rgba(160,96,232,.4)':'rgba(80,160,232,.3)'}`,color:isSocom?C.p:C.b}}>
-                    {isSocom?'SOCOM':(f.mc_flag||'AMC').toUpperCase()}
-                  </span>
-                </td>
-                <td style={{padding:'5px 9px',...Z,color:C.t2,fontSize:10}}>{f.via||f.first_hop||'—'}</td>
-                <td style={{padding:'5px 9px',...R,fontSize:10,color:{ACTIVE:C.g,COMPLETE:C.t3,PENDING:C.a}[f.status]||C.t2}}>{f.status}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11,minWidth:700}}>
+          <thead>
+            <tr style={{background:C.bg4,position:'sticky',top:0}}>
+              {['DATE','CALLSIGN','HEX','SERIAL','MISSION CODE','ORIGIN','TYPE','VIA','STATUS'].map(h=>(
+                <th key={h} style={{...R,fontSize:9,fontWeight:600,letterSpacing:2,color:C.t2,padding:'6px 9px',borderBottom:`1px solid ${C.br}`,textAlign:'left',whiteSpace:'nowrap'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {flights.map(f=>{
+              const isSocom=f.mc_flag==='socom'
+              const isArmy=(f.mc_flag==='amc'&&f.notes?.toLowerCase().includes('army'))
+              return (
+                <tr key={f.id} style={{borderBottom:`1px solid rgba(30,44,58,.4)`}}>
+                  <td style={{padding:'5px 9px',...Z,color:C.t3,fontSize:10,whiteSpace:'nowrap'}}>{f.dep_date?.slice(5)||'—'}</td>
+                  <td style={{padding:'5px 9px',...R,fontWeight:700,color:C.tb,fontSize:12,whiteSpace:'nowrap'}}>{normCallsign(f.callsign)}</td>
+                  <td style={{padding:'5px 9px',...Z,color:C.y,fontSize:10}}>{f.hex||'—'}</td>
+                  <td style={{padding:'5px 9px',...Z,color:C.t2,fontSize:10}}>{f.serial||'—'}</td>
+                  <td style={{padding:'5px 9px',...Z,fontSize:10,color:C.t1,whiteSpace:'nowrap'}}>{f.mission_code||'—'}</td>
+                  <td style={{padding:'5px 9px',...Z,color:C.b,fontSize:10}}>{f.base||'—'}</td>
+                  <td style={{padding:'5px 9px'}}>
+                    <span style={{...R,fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:1,
+                      background:isSocom?'rgba(160,96,232,.15)':isArmy?'rgba(232,208,64,.1)':'rgba(80,160,232,.12)',
+                      border:`1px solid ${isSocom?'rgba(160,96,232,.4)':isArmy?'rgba(232,208,64,.3)':'rgba(80,160,232,.3)'}`,
+                      color:isSocom?C.p:isArmy?C.y:C.b}}>
+                      {isSocom?'SOCOM':isArmy?'ARMY':'AMC'}
+                    </span>
+                  </td>
+                  <td style={{padding:'5px 9px',...Z,color:C.t2,fontSize:10}}>{f.via||f.first_hop||'—'}</td>
+                  <td style={{padding:'5px 9px',...R,fontSize:10,color:{ACTIVE:C.g,COMPLETE:C.t3,PENDING:C.a}[f.status]||C.t2,whiteSpace:'nowrap'}}>{f.status}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
