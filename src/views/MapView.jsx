@@ -6,7 +6,6 @@ import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
 
-// Error boundary — catches React crashes and shows message instead of black screen
 class ErrorBoundary extends React.Component {
   state = { error: null }
   static getDerivedStateFromError(e) { return { error: e } }
@@ -50,7 +49,6 @@ const VIEWS = {
 }
 
 const ICAO_COORDS = {
-  // CONUS
   KSVN:[32.015,-81.145], KPOB:[35.171,-79.014], KHOP:[36.669,-87.496],
   KGRF:[47.079,-122.580], KTCM:[47.138,-122.476], KNTU:[36.937,-76.036],
   KHRT:[30.428,-86.690], KMCF:[27.849,-82.521], KNKX:[32.868,-117.143],
@@ -59,7 +57,6 @@ const ICAO_COORDS = {
   KBOI:[43.564,-116.222], KGRK:[31.067,-97.829], KSSC:[33.972,-80.471],
   KWRB:[32.640,-83.591], KSKA:[47.615,-117.656], KCVS:[34.668,-99.267],
   FJDG:[-7.313,72.411], KMTC:[42.611,-83.150], KLSF:[32.337,-84.991],
-  // AOR destinations
   LLOV:[29.940,34.935], LLNV:[31.208,35.012], LLBG:[31.994,34.888],
   OJKA:[32.356,36.259], OJMS:[31.827,36.789], OKAS:[29.346,47.519],
   OMDM:[25.027,55.366], OMAM:[24.249,54.548], OTBH:[25.117,51.314],
@@ -67,102 +64,60 @@ const ICAO_COORDS = {
   LGEL:[38.065,23.556], LGSA:[35.531,24.147], LCRT:[46.125,23.886],
   LIPA:[46.031,12.596], LTAG:[37.002,35.426], EGVA:[51.682,-1.790],
   EGUL:[52.409,0.560], EGUN:[52.362,0.486],
-  // Additional origins
   KBHM:[33.563,-86.756], KNXX:[40.199,-75.148], KCOS:[38.806,-104.701],
-  // Pacific/overseas
   RJTY:[35.748,139.348], RJSM:[40.703,141.368],
-  // Canada/Atlantic transit
   CYQX:[48.936,-54.568], CYYR:[53.303,-60.426], KPSM:[43.078,-70.823],
 }
 
 const STATIC_ASSETS = [
-  // --- CARRIERS ---
   {id:'cvn78',name:'USS Gerald R. Ford',sub:'CVN-78 // Ford-class',country:'US',type:'carrier',status:'DEPLOYED',lat:43.5,lng:16.5,csg:'CSG-12',
-   aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'},{type:'F/A-18F Super Hornet',qty:'12x',role:'Strike/EW'},{type:'EA-18G Growler',qty:'5x',role:'EW'},{type:'E-2D Hawkeye',qty:'4x',role:'AEW&C'},{type:'MH-60R Seahawk',qty:'8x',role:'ASW/SAR'}],
-   notes:'Adriatic/Split Croatia area 28 Mar. EUCOM/CENTCOM direction.',
-   escorts:[{name:'USS Normandy',sub:'CG-60 Ticonderoga',role:'BMD/AAW'},{name:'USS Ramage',sub:'DDG-61 Burke Flt I',role:'ASW'},{name:'USS McFaul',sub:'DDG-74 Burke Flt II',role:'AAW'},{name:'USS Laboon',sub:'DDG-58 Burke Flt I',role:'ASW'}],
-   sightings:[{dt:'28 Mar 2026',src:'Intel Frog',txt:'CVN-78 confirmed Adriatic/Split area.'},{dt:'31 Mar 2026',src:'OSINT',txt:'CSG-12 underway, CENTCOM-bound posture.'}],tags:['ADRIATIC','CENTCOM-BOUND']},
+   aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'},{type:'EA-18G Growler',qty:'5x',role:'EW'},{type:'E-2D Hawkeye',qty:'4x',role:'AEW&C'},{type:'MH-60R Seahawk',qty:'8x',role:'ASW/SAR'}],
+   notes:'Adriatic/Split Croatia area 28 Mar. EUCOM/CENTCOM direction.',tags:['ADRIATIC','CENTCOM-BOUND']},
   {id:'cvn72',name:'USS Abraham Lincoln',sub:'CVN-72 // Nimitz-class',country:'US',type:'carrier',status:'DEPLOYED',lat:16.0,lng:54.0,csg:'CSG-3',
    aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'},{type:'EA-18G Growler',qty:'5x',role:'EW'},{type:'E-2D Hawkeye',qty:'4x',role:'AEW&C'}],
-   notes:'5th Fleet / Arabian Sea. Houthi suppression. Tomahawk employment confirmed.',
-   escorts:[{name:'USS Mobile Bay',sub:'CG-53 Ticonderoga',role:'BMD'},{name:'USS Fitzgerald',sub:'DDG-62 Burke Flt I',role:'ASW'},{name:'USS Sampson',sub:'DDG-102 Burke Flt IIA',role:'AAW/BMD'}],
-   sightings:[{dt:'30 Mar 2026',src:'5th Fleet PA',txt:'CVN-72 strike ops Arabian Sea.'}],tags:['5TH-FLEET','ARABIAN-SEA']},
+   notes:'5th Fleet / Arabian Sea. Houthi suppression. Tomahawk employment confirmed.',tags:['5TH-FLEET','ARABIAN-SEA']},
   {id:'cvn77',name:'USS George H.W. Bush',sub:'CVN-77 // Nimitz-class',country:'US',type:'carrier',status:'DEPLOYED',lat:36.0,lng:-12.0,csg:'CSG-10',
-   aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'}],
-   notes:'DEPLOYED 31 Mar. Atlantic transit, EUCOM/CENTCOM direction.',
-   escorts:[],sightings:[{dt:'31 Mar 2026',src:'Intel Frog',txt:'CVN-77 deployed. Atlantic transit confirmed.'}],tags:['ATLANTIC','EUCOM-BOUND']},
+   notes:'DEPLOYED 31 Mar. Atlantic transit, EUCOM/CENTCOM direction.',tags:['ATLANTIC','EUCOM-BOUND']},
   {id:'r08',name:'HMS Queen Elizabeth',sub:'R08 // QE-class',country:'UK',type:'carrier',status:'REFIT',lat:56.0,lng:-3.4,csg:'CSG21',
-   aircraftTypes:[{type:'F-35B Lightning II',qty:'8x (reduced)',role:'Strike'},{type:'Merlin HM2',qty:'4x',role:'ASW'}],
-   notes:'Refit Rosyth 482 days. POW also maintenance Portsmouth.',
-   escorts:[],sightings:[{dt:'Mar 2026',src:'RN',txt:'QE refit Rosyth.'}],tags:['REFIT','ROSYTH']},
+   notes:'Refit Rosyth 482 days. POW also maintenance Portsmouth.',tags:['REFIT','ROSYTH']},
   {id:'r91',name:'Charles de Gaulle',sub:'R91 // CdG-class',country:'FR',type:'carrier',status:'DEPLOYED',lat:34.0,lng:28.0,csg:'TF-473',
-   aircraftTypes:[{type:'Rafale M',qty:'24x',role:'Strike'},{type:'E-2C Hawkeye',qty:'3x',role:'AEW&C'}],
-   notes:'Eastern Med. TF-473. Active strike role.',
-   escorts:[{name:'FNS Provence',sub:'D652 Horizon',role:'AAW'},{name:'FNS Alsace',sub:'D656 FDI',role:'ASW'}],
-   sightings:[{dt:'30 Mar 2026',src:'TF-473 PA',txt:'CdG sustained Rafale ops East Med.'}],tags:['EASTMED','TF-473']},
-  // --- DESTROYERS ---
-  {id:'ddg51',name:'USS Arleigh Burke',sub:'DDG-51 // Burke Flt I',country:'US',type:'destroyer',status:'DEPLOYED',lat:33.0,lng:32.0,aircraftTypes:[{type:'MH-60R',qty:'1x',role:'ASW'}],notes:'Eastern Med. BMD.',tags:['EASTMED']},
-  {id:'ddg125',name:'USS Jack H. Lucas',sub:'DDG-125 // Burke Flt III',country:'US',type:'destroyer',status:'DEPLOYED',lat:22.0,lng:58.0,aircraftTypes:[{type:'MH-60R',qty:'1x',role:'ASW'}],notes:'5th Fleet Arabian Sea.',tags:['5TH-FLEET']},
-  {id:'d34',name:'HMS Diamond',sub:'D34 // Type 45',country:'UK',type:'destroyer',status:'DEPLOYED',lat:35.0,lng:33.0,aircraftTypes:[{type:'Wildcat HMA2',qty:'1x',role:'ASW'}],notes:'Med E / Akrotiri area.',tags:['MED']},
-  // --- SUBMARINES ---
-  {id:'ssn795',name:'USS H.G. Rickover',sub:'SSN-795 // Virginia Blk V',country:'US',type:'submarine',status:'DEPLOYED',lat:33.5,lng:26.0,notes:'CentMed assessed. VPM 40× TLAM.',tags:['ASSESSED','VPM']},
-  {id:'anson',name:'HMS Anson',sub:'S123 // Astute-class',country:'UK',type:'submarine',status:'DEPLOYED',lat:-30.0,lng:78.0,notes:'Indian Ocean / AUKUS.',tags:['AUKUS']},
-  // --- AIRBASES ---
+   notes:'Eastern Med. TF-473. Active strike role.',tags:['EASTMED','TF-473']},
+  {id:'ddg51',name:'USS Arleigh Burke',sub:'DDG-51 // Burke Flt I',country:'US',type:'destroyer',status:'DEPLOYED',lat:33.0,lng:32.0,tags:['EASTMED']},
+  {id:'ddg125',name:'USS Jack H. Lucas',sub:'DDG-125 // Burke Flt III',country:'US',type:'destroyer',status:'DEPLOYED',lat:22.0,lng:58.0,tags:['5TH-FLEET']},
+  {id:'d34',name:'HMS Diamond',sub:'D34 // Type 45',country:'UK',type:'destroyer',status:'DEPLOYED',lat:35.0,lng:33.0,tags:['MED']},
+  {id:'ssn795',name:'USS H.G. Rickover',sub:'SSN-795 // Virginia Blk V',country:'US',type:'submarine',status:'DEPLOYED',lat:33.5,lng:26.0,tags:['ASSESSED','VPM']},
+  {id:'anson',name:'HMS Anson',sub:'S123 // Astute-class',country:'UK',type:'submarine',status:'DEPLOYED',lat:-30.0,lng:78.0,tags:['AUKUS']},
   {id:'otbh',name:'Al Udeid AB',sub:'OTBH // Qatar',country:'US',type:'airbase',status:'SURGE',lat:25.117,lng:51.314,arrCnt:14,socomCnt:4,
-   aircraftTypes:[{type:'B-52H Stratofortress',qty:'2x (surged)',role:'Strategic Bomber',tails:['60-0040','60-0047']},{type:'F-35A Lightning II',qty:'12x',role:'Strike'},{type:'F-15E Strike Eagle',qty:'8x',role:'Strike'},{type:'KC-46A Pegasus',qty:'4x',role:'Tanker'},{type:'E-3 AWACS',qty:'2x',role:'AEW&C'},{type:'RQ-4 Global Hawk',qty:'1x',role:'ISR'}],
    intel:'14 AMC arrivals / 48h vs baseline ~6. SOCOM missions = 4 of 14. Surge sustained.',tags:['SURGE','CENTCOM','OP-EPIC-FURY']},
   {id:'llov',name:'Ovda AB',sub:'LLOV // Israel',country:'US',type:'airbase',status:'ELEVATED',lat:29.94,lng:34.935,arrCnt:26,socomCnt:12,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'26+ arrivals tracked',role:'Strategic Airlift',tails:['00-0181','07-7178','02-1110','99-0059','05-5140','08-8195','07-7174','00-0177','06-6159','08-8190']}],
    intel:'26 confirmed arrivals. KPOB/KSVN/KNTU dominant origins. All SOCOM flagged. Strategic reserve pre-positioning assessed.',tags:['SURGE','IDF','CENTCOM']},
   {id:'ojka',name:'King Abdullah II AB',sub:'OJKA // Jordan',country:'US',type:'airbase',status:'ELEVATED',lat:32.356,lng:36.259,arrCnt:30,socomCnt:12,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'30+ arrivals',role:'SAAM/SOCOM/Army',tails:['07-7182','06-6163','03-3126','04-4130','01-0189','08-8198','05-5142','01-0186','09-9210','92-3292','00-0183','04-4133','04-4130']}],
-   intel:'Highest single-destination volume. Extensive onward movement to OJAQ and OJMS (Muwaffaq Salti AB, Azraq — low-visibility target). SAAM and Army series confirmed.',tags:['JORDAN','HIGHEST-VOLUME']},
+   intel:'Highest single-destination volume. Extensive onward movement to OJAQ and OJMS.',tags:['JORDAN','HIGHEST-VOLUME']},
   {id:'ojms',name:'Muwaffaq Salti AB',sub:'OJMS // Jordan (Azraq)',country:'US',type:'airbase',status:'ELEVATED',lat:31.827,lng:36.789,arrCnt:19,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'19+ tracked arrivals',role:'Strategic Airlift',tails:['04-4131','92-3294','94-0067','98-0056','08-8200','98-0053','93-0604','07-7182','03-3126','00-0181','98-0052','89-1191']}],
-   intel:'Low-visibility base — limited ACARS coverage. Arrivals from FJDG (Diego Garcia), KMTC (Selfridge), KWRI, KCHS. Diego Garcia routing (FJDG->HDAM->OJMS) indicates pre-positioned equipment offload. Emerges as likely final destination for significant portion of OJKA onward movements.',tags:['JORDAN','FINAL-DEST','LOW-VISIBILITY']},
+   intel:'Low-visibility base. Arrivals from FJDG (Diego Garcia), KMTC (Selfridge), KWRI, KCHS.',tags:['JORDAN','FINAL-DEST','LOW-VISIBILITY']},
   {id:'okas',name:'Ali Al Salem AB',sub:'OKAS // Kuwait',country:'US',type:'airbase',status:'ELEVATED',lat:29.346,lng:47.519,arrCnt:10,socomCnt:2,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'10+ tracked',role:'Army/SOCOM Airlift',tails:['02-1098','98-0051','04-4133','96-0006','10-0218','07-7186','93-0601','02-1111','06-6166','95-0104']},{type:'C-130J / MC-130J',qty:'assessed',role:'Tactical/SOCOM'}],
-   intel:'Army-Z mission series (A177/A179/A182) via Spangdahlem (ETAD). Pope Army Field dominant origin. OKAS→LTAG (Incirlik) and OKAS→OEPS (Prince Sultan AB) onward tracked.',tags:['KUWAIT','ARMY-Z']},
+   intel:'Army-Z mission series (A177/A179/A182) via Spangdahlem (ETAD).',tags:['KUWAIT','ARMY-Z']},
   {id:'oeps',name:'Prince Sultan AB',sub:'OEPS // Saudi Arabia',country:'US',type:'airbase',status:'ELEVATED',lat:24.062,lng:47.580,arrCnt:16,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'14x C-17 tracked',role:'Strategic Airlift'},{type:'C-5M Super Galaxy',qty:'4x',role:'Strategic Airlift'}],
-   intel:'Major build-up via Diego Garcia (FJDG->OEPS direct). Army and Air Force series confirmed. C-5 missions indicate heavy equipment airlift. Onward from OKAS also confirmed.',tags:['KSA','BUILD-UP']},
+   intel:'Major build-up via Diego Garcia (FJDG->OEPS direct).',tags:['KSA','BUILD-UP']},
   {id:'llnv',name:'Nevatim AB',sub:'LLNV // Israel',country:'US',type:'airbase',status:'ELEVATED',lat:31.208,lng:35.012,arrCnt:4,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'4 confirmed arrivals',role:'Strategic Airlift',tails:['05-5141','97-0042','08-8201','05-5149']}],
-   intel:'Second Israeli staging base identified. Origins: Shaw AFB, Robins AFB, Misawa AB, Selfridge ANGB. Parallel to LLOV (Ovda). SAAM missions confirmed.',tags:['ISRAEL','NEW-DEST','EMERGING']},
+   intel:'Second Israeli staging base identified. Origins: Shaw AFB, Robins AFB, Misawa AB, Selfridge ANGB.',tags:['ISRAEL','NEW-DEST','EMERGING']},
   {id:'llbg',name:'Ben Gurion Airport',sub:'LLBG // Israel (Civil/Dual-use)',country:'US',type:'airbase',status:'ACTIVE',lat:31.994,lng:34.888,arrCnt:6,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'6 confirmed',role:'Strategic Airlift',tails:['97-0042','93-0602','10-0220','95-0105','99-0062','99-0169']}],
-   intel:'Civil dual-use airport receiving USAF C-17 traffic. Pease ANGB dominant origin. All routing via ETAD/ETAR. Likely logistics/personnel airlift distinct from LLOV/LLNV military cargo.',tags:['ISRAEL','DUAL-USE']},
+   intel:'Civil dual-use airport receiving USAF C-17 traffic.',tags:['ISRAEL','DUAL-USE']},
   {id:'lgel',name:'Elefsis AB',sub:'LGEL // Greece',country:'US',type:'airbase',status:'ELEVATED',lat:38.065,lng:23.556,arrCnt:5,socomCnt:3,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'5 confirmed arrivals',role:'SAAM/SOCOM Airlift',tails:['01-0186','99-0001','95-0104','02-1110','06-6164']}],
-   intel:'Emerged late March. KPOB (Pope) and KMDT (Harrisburg ANG) dominant. SAAM missions = 3 of 5. Eastern Med staging. Significance: positions forces between EUCOM and CENTCOM.',tags:['GREECE','NATO','SAAM']},
+   intel:'Emerged late March. KPOB (Pope) and KMDT (Harrisburg ANG) dominant.',tags:['GREECE','NATO','SAAM']},
   {id:'lgsa',name:'Souda Bay / Chania',sub:'LGSA // Crete, Greece',country:'US',type:'airbase',status:'ACTIVE',lat:35.531,lng:24.147,arrCnt:4,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'4 confirmed',role:'Navy/Strategic Airlift',tails:['05-5152','09-9210','99-0059','03-3116']},{type:'EA-37B Compass Call',qty:'2x (AXIS 41/43)',role:'EW — departed to Souda 2 Apr'}],
-   intel:'Staging for Eastern Med Navy operations. PHNL (Hickam) and Yokota origins. ETAD->LGSA->LLOV routing on some missions. EA-37B EW aircraft AXIS 41/43 arrived from Mildenhall 2 Apr — significant EW capability forward deployment.',tags:['CRETE','NATO','EW']},
+   intel:'Staging for Eastern Med Navy operations.',tags:['CRETE','NATO','EW']},
   {id:'etar',name:'Ramstein AB',sub:'ETAR // Germany',country:'US',type:'airbase',status:'ACTIVE',lat:49.437,lng:7.600,arrCnt:5,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'rotational',role:'Gateway/Staging'},{type:'KC-135R',qty:'2x det',role:'Tanker'},{type:'C-130J',qty:'assessed',role:'Tactical'}],
-   intel:'Universal CONUS→CENTCOM gateway. Every tracked mission transits ETAR. Critical logistics node.',tags:['EUCOM','STAGING','GATEWAY']},
+   intel:'Universal CONUS→CENTCOM gateway. Every tracked mission transits ETAR.',tags:['EUCOM','STAGING','GATEWAY']},
   {id:'egva',name:'RAF Fairford',sub:'EGVA // UK — USAF BOMBER HUB',country:'US',type:'airbase',status:'SURGE',lat:51.682,lng:-1.790,arrCnt:0,socomCnt:0,
-   aircraftTypes:[
-     {type:'B-52H Stratofortress',qty:'8x',role:'Strategic Bomber — Op EPIC FURY',tails:['61-0001 (FLIP 61 "Freedom Bird")','61-0035 (FLIP 62 "Witch\'s Brew")','60-0012 (FLIP 63 "Heavy Hauler")','60-0007 (HOOKY 23 "Guardians")','60-0060 (HOOKY 22 "Iron Butterfly")','60-0023 (HOOKY 21 "Bomber Barons")']},
-     {type:'B-1B Lancer',qty:'18x+',role:'Strategic Bomber — Op EPIC FURY',tails:['86-0129 (TWIN 44 "Black Widow")','86-0102 (TWIN 43 "Bad Moon Rising")','85-0072 (TWIN 42 "Polarized")','86-0138 (TWIN 41 "Seek & Destroy")','86-0107 (MOLT 13 "Dragon Slayer")','85-0088 (MOLT 12)','85-0064 (MOLT 11 "Valkyrie")','86-0140 (MOLT 14 "Last Lance")','86-0139 (PIKE 74 "Drifter")','86-0108 (PIKE 73 "Alien")','86-0121 (PIKE 72)','85-0060 (PURSE 33)','86-0134 (PURSE 34 "Thunderbird")','85-0069 (PURSE 35 "Avenger")']},
-   ],
-   intel:'CONFIRMED: 8x B-52H + 18+ B-1B as of 28 Mar 2026. Largest US forward bomber deployment since Gulf War. B-52H: 5BW (Minot) + 2BW (Barksdale). B-1B: 7BW (Dyess) + 28BW (Ellsworth) + 34BS (Whiteman). Op EPIC FURY strike platform.',tags:['SURGE','B-52H','B-1B','OP-EPIC-FURY']},
+   intel:'CONFIRMED: 8x B-52H + 18+ B-1B as of 28 Mar 2026. Largest US forward bomber deployment since Gulf War.',tags:['SURGE','B-52H','B-1B','OP-EPIC-FURY']},
   {id:'egun',name:'RAF Mildenhall',sub:'EGUN // UK — SOCOM/AFSOC HUB',country:'US',type:'airbase',status:'SURGE',lat:52.362,lng:0.486,arrCnt:41,socomCnt:41,
-   aircraftTypes:[
-     {type:'MC-130J Commando II',qty:'41+ staged (11x Silent Knight)',role:'SOCOM Assault/Infiltration',tails:['14-5805 (UNLIT 77/BZAIN 31)','BLATE 83-99 series (9x)','AGREE 08/33/35/41/43/45 series','PILUM 41-55 series','SWASH 03-09 series','DACHA 11-13','LAPEL 23-27']},
-     {type:'AC-130 Spectre/Spooky',qty:'3x',role:'Gunship — RAF Lakenheath',tails:['HEEL 51','HEEL 53','HEEL 55']},
-     {type:'EA-37B Compass Call',qty:'2x (departed)',role:'EW — departed to Souda Bay 2 Apr',tails:['AE17CD 19-1587 (AXIS 41)','AE142E 17-5579 (AXIS 43)']},
-   ],
-   intel:'41+ MC-130J staged through since 3 Mar. Aircraft arriving 0000-0400z unmarked/tail numbers taped. Most with 20+ PAX inbound. 11 confirmed Silent Knight EW-mod aircraft. Callsign patterns: UNLIT/BLATE/AGREE/PILUM/SWASH/DACHA/LAPEL. SWASH 09 grounded (bird strike 23 Mar). Mass departure 25-26 Mar. USMC KC-130 from Miramar also present.',tags:['SURGE','MC-130J','SILENT-KNIGHT','AFSOC','OP-EPIC-FURY']},
-  // Staging / transit bases
+   intel:'41+ MC-130J staged through since 3 Mar.',tags:['SURGE','MC-130J','SILENT-KNIGHT','AFSOC','OP-EPIC-FURY']},
   {id:'fjdg',name:'Diego Garcia NSF',sub:'FJDG // British Indian Ocean Territory',country:'US',type:'airbase',status:'ACTIVE',lat:-7.3132,lng:72.4108,arrCnt:0,socomCnt:0,
-   aircraftTypes:[{type:'B-52H / B-1B (rotational)',qty:'surge capable',role:'Strategic Bomber'},{type:'P-8A Poseidon',qty:'rotational',role:'ISR/MPA'},{type:'C-17A',qty:'transit',role:'Pre-position Staging'}],
-   intel:'Major pre-positioning hub. 18+ C-17 missions routing FJDG→OJMS/OEPS/HDAM confirmed. Watson-class LMSR pre-positioned. Critical CENTCOM logistics node.',tags:['CENTCOM','PRE-POSITION','DIEGO-GARCIA']},
+   intel:'Major pre-positioning hub.',tags:['CENTCOM','PRE-POSITION','DIEGO-GARCIA']},
   {id:'etad',name:'Spangdahlem AB',sub:'ETAD // Germany',country:'US',type:'airbase',status:'ACTIVE',lat:49.972,lng:6.693,arrCnt:0,socomCnt:0,
-   aircraftTypes:[{type:'C-17A Globemaster III',qty:'transit/staging',role:'Strategic Airlift'},{type:'F-16C Fighting Falcon',qty:'52nd FW organic',role:'Fighter'}],
-   intel:'Army-Z mission staging node — PMZ/JMZ/AMZ series route via ETAD en route to OKAS/OJMS. Several CORONET support missions staged here.',tags:['EUCOM','ARMY-Z','STAGING']},
-  // Events
-  {id:'ev001',name:'Op EPIC FURY — Iran',sub:'CENTCOM // ONGOING',country:'US',type:'strike',status:'ONGOING',lat:32.0,lng:53.0,notes:'8000+ targets struck. 120+ Iranian vessels sunk. B-52H/B-1B/F-18/Tomahawk.',tags:['OP-EPIC-FURY','IRAN']},
+   intel:'Army-Z mission staging node.',tags:['EUCOM','ARMY-Z','STAGING']},
+  {id:'ev001',name:'Op EPIC FURY — Iran',sub:'CENTCOM // ONGOING',country:'US',type:'strike',status:'ONGOING',lat:32.0,lng:53.0,notes:'8000+ targets struck.',tags:['OP-EPIC-FURY','IRAN']},
   {id:'ev002',name:'Houthi Suppression',sub:'OIR // ONGOING',country:'US',type:'strike',status:'ONGOING',lat:15.5,lng:43.5,notes:'CVN-72 sustained ops. Tomahawk confirmed.',tags:['OIR','HOUTHI']},
 ]
 
@@ -182,7 +137,7 @@ const STATIC_CORONETS = [
 
 const CONUS_META = {
   KSVN:{name:'Hunter AAF',unit:'3rd SF Group / USASOC',region:'Savannah, GA'},
-  KPOB:{name:'Pope Field',unit:'82nd Airborne / JSOC (XVIII ABN Corps)',region:'Fort Bragg, NC'},
+  KPOB:{name:'Pope Field',unit:'82nd Airborne / JSOC',region:'Fort Bragg, NC'},
   KHOP:{name:'Campbell AAF',unit:'101st Airborne / 160th SOAR',region:'Fort Campbell, KY'},
   KGRF:{name:'Gray AAF (JBLM)',unit:'I Corps / 2nd SFOD',region:'Tacoma, WA'},
   KTCM:{name:'McChord AFB',unit:'62nd Airlift Wing (AMC)',region:'JBLM, WA'},
@@ -198,25 +153,23 @@ const CONUS_META = {
   KBHM:{name:'Birmingham ANGB',unit:'117th ARW — KC-135',region:'Birmingham, AL'},
   KBOI:{name:'Gowen Field ANGB',unit:'124th FW — A-10C',region:'Boise, ID'},
   KCVS:{name:'Altus AFB',unit:'97th AMW (AETC) — KC-46',region:'Altus, OK'},
-  KNXX:{name:'NAS Willow Grove (NASJRB)',unit:'Naval Reserve / P-8 det',region:'Willow Grove, PA'},
+  KNXX:{name:'NAS Willow Grove',unit:'Naval Reserve / P-8 det',region:'Willow Grove, PA'},
   KCOS:{name:'Peterson SFB',unit:'Space Command / 21st SW',region:'Colorado Springs, CO'},
   KSSC:{name:'Shaw AFB',unit:'20th FW — F-16C',region:'Sumter, SC'},
   KWRB:{name:'Robins AFB',unit:'78th ABW / WR-ALC',region:'Warner Robins, GA'},
   KSKA:{name:'Fairchild AFB',unit:'92nd ARW — KC-135/KC-46',region:'Spokane, WA'},
-  KGRK:{name:'Gray AAF / Fort Cavazos',unit:'III Corps / 1st Cavalry Division',region:'Killeen, TX'},
+  KGRK:{name:'Gray AAF / Fort Cavazos',unit:'III Corps / 1st Cavalry Div',region:'Killeen, TX'},
   KDOV:{name:'Dover AFB',unit:'436th AW — C-17/C-5',region:'Dover, DE'},
   KSUU:{name:'Travis AFB',unit:'60th AMW — C-17/C-5',region:'Fairfield, CA'},
 }
 
 const FEED_ITEMS = [
   {t:'0904Z',h:'<b>Op EPIC FURY</b> <span style="color:#e85040">●</span> CENTCOM: 8000+ targets struck Iran. 120+ vessels sunk.'},
-  {t:'0847Z',h:'<b>EGUN</b> EA-37B AXIS 41/43 departed Mildenhall → <b>LGSA (Souda Bay)</b>. EW forward deployment.'},
-  {t:'0821Z',h:'<b>OJMS</b> <span style="color:#e85040">▲</span> Muwaffaq Salti AB now 19+ confirmed C-17 arrivals. FJDG->HDAM->OJMS routing confirmed.'},
-  {t:'0754Z',h:'<b>EGUN</b> 41+ MC-130J staged through. 11x Silent Knight mod. Mass departure 25-26 Mar.'},
+  {t:'0847Z',h:'<b>EGUN</b> EA-37B AXIS 41/43 departed Mildenhall → <b>LGSA (Souda Bay)</b>.'},
+  {t:'0821Z',h:'<b>OJMS</b> <span style="color:#e85040">▲</span> Muwaffaq Salti AB now 19+ confirmed C-17 arrivals.'},
+  {t:'0754Z',h:'<b>EGUN</b> 41+ MC-130J staged through. 11x Silent Knight mod.'},
   {t:'0712Z',h:'<b>LMSR Pililaau</b> <span style="color:#e85040">●</span> Diego Garcia — departure IMMINENT.'},
-  {t:'0633Z',h:'<b>LLNV</b> (Nevatim AB) NEW destination. 4x C-17 arrivals Shaw/Robins/Misawa origins.'},
-  {t:'0541Z',h:'<b>CVN-77</b> USS George HW Bush DEPLOYED 31 Mar — Atlantic transit.'},
-  {t:'0502Z',h:'<b>LGSA</b> (Souda Bay/Crete) EA-37B AXIS 41/43 arrived from Mildenhall.'},
+  {t:'0633Z',h:'<b>LLNV</b> (Nevatim AB) NEW destination. 4x C-17 arrivals.'},
 ]
 
 function FlyTo({ target }) {
@@ -226,19 +179,18 @@ function FlyTo({ target }) {
 }
 
 export function MapView({ auth }) {
-  const { flights, byBase, byDest, loading } = useFlights({ limit: 2000 })
-  const { assets: dbAssets, loading: assetsLoading } = useAssets()
+  const { flights, byBase, loading } = useFlights({ limit: 2000 })
+  const { assets: dbAssets } = useAssets()
 
-  // Merge DB assets with static fallback - DB takes priority for positions/status
-  const allDbAssets = dbAssets.length > 0 ? dbAssets.map(a => ({
+  const allAssets = dbAssets.length > 0 ? dbAssets.map(a => ({
     id: a.icao_code?.toLowerCase() || a.id,
     name: a.name,
     sub: a.designation,
     country: a.country?.trim(),
     type: a.asset_type,
     status: a.status,
-    lat: parseFloat(a.lat),
-    lng: parseFloat(a.lng),
+    lat: a.lat != null ? parseFloat(a.lat) : null,
+    lng: a.lng != null ? parseFloat(a.lng) : null,
     arrCnt: a.arr_count || 0,
     socomCnt: a.socom_count || 0,
     hull: a.hull_number,
@@ -250,10 +202,9 @@ export function MapView({ auth }) {
     centcom: a.centcom_relevance,
     cat: a.lmsr_category || (a.asset_type === 'lmsr' ? 'forward' : null),
     tags: a.tags || [],
-    aircraftTypes: STATIC_ASSETS.find(s => 
-      s.id === (a.icao_code?.toLowerCase() || a.id) || s.sub === a.designation
-    )?.aircraftTypes || [],
+    aircraftTypes: STATIC_ASSETS.find(s => s.id === (a.icao_code?.toLowerCase() || a.id))?.aircraftTypes || [],
   })) : STATIC_ASSETS
+
   const [layers, setLayers] = useState({ carriers:true, destroyers:true, subs:true, lmsr:true, airbases:true, conus:true, strikes:true })
   const [country, setCountry]   = useState('ALL')
   const [selAsset, setSelAsset] = useState(null)
@@ -273,15 +224,11 @@ export function MapView({ auth }) {
     return () => supabase.removeChannel(ch)
   }, [])
 
-  const allAssets = allDbAssets
-  const filtered  = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr' || a.type==='lmsr')
+  const filtered  = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr')
 
-  function selectAsset(a) { setSelAsset(a); setSelCor(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
+  function selectAsset(a) { setSelAsset(a); setSelCor(null); if(a.lat != null && a.lng != null) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
   function selectCoronet(c) { setSelCor(selCor?.id===c.id?null:c); setSelAsset(null) }
 
-  const naval    = filtered.filter(a=>['carrier','destroyer','submarine'].includes(a.type)).length
-  const bases    = filtered.filter(a=>a.type==='airbase').length
-  const socomCnt = flights.filter(f=>f.mc_flag==='socom').length
   const routeLines = showRoutes ? flights.filter(f=>ICAO_COORDS[f.base]&&ICAO_COORDS[f.destination]) : []
 
   return (
@@ -343,7 +290,7 @@ export function MapView({ auth }) {
           ))}
 
           {/* Airbases */}
-          {layers.airbases && allAssets.filter(a=>a.type==='airbase'&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
+          {layers.airbases && allAssets.filter(a=>a.type==='airbase' && a.lat != null && a.lng != null && (country==='ALL'||a.country?.trim()===country)).map(a=>{
             const col=a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g
             return (
               <Marker key={a.id} position={[a.lat,a.lng]}
@@ -364,10 +311,12 @@ export function MapView({ auth }) {
             )
           })}
 
-          {/* CONUS departures — same marker style */}
+          {/* CONUS departures — Fixed the bug here! */}
           {layers.conus && Object.entries(byBase).map(([icao,data])=>{
-            if(!CONUS_META[icao]) return null  // Only show actual CONUS bases - not ETAR, LIPA, FJDG etc
+            if(!CONUS_META[icao]) return null  
             const meta=CONUS_META[icao]||{}
+            const coords = ICAO_COORDS[icao]
+            if(!coords) return null
             return (
               <Marker key={icao+'_c'} position={coords}
                 icon={mkIcon('◄',data.socom>0?C.p:C.b,22,false,data.total>5?String(data.total):null)}
@@ -383,16 +332,16 @@ export function MapView({ auth }) {
             )
           })}
 
-          {layers.carriers && allAssets.filter(a=>a.type==='carrier'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.carriers && allAssets.filter(a=>a.type==='carrier' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🚢',a.status==='REFIT'?C.t3:C.b,28,a.status==='DEPLOYED')} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.destroyers && allAssets.filter(a=>a.type==='destroyer'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.destroyers && allAssets.filter(a=>a.type==='destroyer' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('⚓',C.b,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.subs && allAssets.filter(a=>a.type==='submarine'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.subs && allAssets.filter(a=>a.type==='submarine' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🔵',C.p,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr').map(s=>{
+          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr' && a.lat != null && a.lng != null ).map(s=>{
             const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
             return (
               <Marker key={s.id} position={[s.lat,s.lng]} icon={mkIcon('🚛',col,22,s.cat==='forward')}
@@ -407,12 +356,11 @@ export function MapView({ auth }) {
               </Marker>
             )
           })}
-          {layers.strikes && allAssets.filter(a=>a.type==='strike'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.strikes && allAssets.filter(a=>a.type==='strike' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('⚡',C.r,24,true)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
         </MapContainer>
 
-        {/* View presets */}
         <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',zIndex:900,display:'flex',gap:3,background:'rgba(7,9,11,.92)',border:`1px solid ${C.br2}`,padding:5,backdropFilter:'blur(8px)'}}>
           {Object.keys(VIEWS).map(k=>(
             <button key={k} onClick={()=>setFlyTarget(VIEWS[k])}
@@ -422,9 +370,8 @@ export function MapView({ auth }) {
           ))}
         </div>
 
-        {/* Stat strip */}
         <div style={{position:'absolute',top:0,left:0,right:0,zIndex:800,background:'rgba(7,9,11,.88)',borderBottom:`1px solid ${C.br}`,display:'flex',backdropFilter:'blur(6px)'}}>
-          {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'SOCOM',v:socomCnt,c:C.p},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.g}].map(({l,v,c})=>(
+          {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'SOCOM',v:flights.filter(f=>f.mc_flag==='socom').length,c:C.p},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.g}].map(({l,v,c})=>(
             <div key={l} style={{padding:'5px 14px',borderRight:`1px solid ${C.br}`}}>
               <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:1}}>{l}</div>
               <div style={{...R,fontSize:16,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
@@ -441,7 +388,6 @@ export function MapView({ auth }) {
           : selCor   ? <CorDetail cor={selCor} />
           : <EmptyDetail />}
         </div>
-        {/* Feed */}
         <div style={{height:165,borderTop:`1px solid ${C.br}`,background:C.bg,flexShrink:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
           <div style={{padding:'5px 12px',background:C.bg4,borderBottom:`1px solid ${C.br}`,display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
             <span style={{...R,fontSize:10,fontWeight:600,letterSpacing:3,color:C.t2}}>SIGACT FEED</span>
@@ -458,12 +404,11 @@ export function MapView({ auth }) {
         </div>
       </div>
 
-      {/* Status bar */}
       <div style={{gridColumn:'1/4',height:24,background:C.bg4,borderTop:`1px solid ${C.br}`,display:'flex',alignItems:'center',padding:'0 14px',gap:16,flexShrink:0}}>
-        {[{l:'NAVAL',v:naval,c:C.b},{l:'BASES',v:bases,c:C.g},{l:'LMSR',v:LMSR_DATA.length,c:C.y},{l:'AMC',v:loading?'…':flights.length,c:C.b}].map(({l,v,c})=>(
+        {[{l:'NAVAL',v:allAssets.filter(a=>['carrier','destroyer','submarine'].includes(a.type)).length,c:C.b},{l:'BASES',v:allAssets.filter(a=>a.type==='airbase').length,c:C.g},{l:'LMSR',v:LMSR_DATA.length,c:C.y},{l:'AMC',v:loading?'…':flights.length,c:C.b}].map(({l,v,c})=>(
           <span key={l} style={{...Z,fontSize:10,color:C.t2}}>{l} <b style={{color:c,fontWeight:400}}>{v}</b></span>
         ))}
-        {auth.isAdmin&&<span style={{...Z,fontSize:9,color:C.r,marginLeft:'auto',letterSpacing:1}}>● ADMIN MODE</span>}
+        {auth?.isAdmin&&<span style={{...Z,fontSize:9,color:C.r,marginLeft:'auto',letterSpacing:1}}>● ADMIN MODE</span>}
       </div>
 
       {abmAsset && <AbmModal asset={abmAsset} flights={flights} onClose={()=>setAbmAsset(null)} />}
@@ -535,7 +480,6 @@ function ADetail({asset,onExpand,flights}) {
   const stCol={DEPLOYED:C.g,ACTIVE:C.g,SURGE:C.r,ELEVATED:C.a,ONGOING:C.r,REFIT:C.t3}[asset.status]||C.t2
   const [selAc, setSelAc] = useState(null)
 
-  // CONUS base view
   if(asset.type==='conus_base') {
     const bf = flights.filter(f=>f.base===asset.id)
     const recent = bf.filter(f=>f.dep_date&&new Date(f.dep_date)>=new Date(Date.now()-7*864e5))
@@ -569,7 +513,6 @@ function ADetail({asset,onExpand,flights}) {
             ))}
           </div>
         )}
-        {/* Same expand button as AOR bases */}
         <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
           <button onClick={()=>onExpand&&onExpand()}
             style={{display:'block',width:'100%',padding:6,...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.a}`,background:'rgba(240,160,64,.08)',color:C.a,cursor:'pointer'}}>
@@ -593,7 +536,6 @@ function ADetail({asset,onExpand,flights}) {
     )
   }
 
-  // All other assets
   return (
     <div>
       <div style={{padding:'11px 13px',borderBottom:`1px solid ${C.br}`}}>
@@ -621,7 +563,6 @@ function ADetail({asset,onExpand,flights}) {
       {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
       {asset.type==='lmsr'&&asset.loc&&<DBlk label="POSITION" value={`${asset.loc}\nLast report: ${asset.lastRpt}`} />}
 
-      {/* Aircraft types — prominent qty, click for tails */}
       {asset.aircraftTypes?.length>0&&(
         <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
           <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>AIRCRAFT ON STATION</div>
@@ -743,12 +684,9 @@ function DBlk({label,value,large,highlight}) {
 
 function AbmModal({asset,flights,onClose}) {
   const [tab,setTab] = useState('OVERVIEW')
-  // Derive all possible ICAO codes for this asset
-  // asset.id is lowercase ('otbh'), asset.sub is 'OTBH // Qatar', flights use uppercase
   const icaoFromSub = asset.sub?.split('//')[0]?.trim().toUpperCase()
   const icaoFromId  = asset.id?.toUpperCase()
   const icaoCodes   = [...new Set([icaoFromSub, icaoFromId].filter(Boolean))]
-  // Match flights against any of the derived codes
   const inbound  = flights.filter(f => icaoCodes.includes(f.destination?.toUpperCase()))
   const outbound = flights.filter(f => icaoCodes.includes(f.base?.toUpperCase()))
   const socomIn  = inbound.filter(f=>f.mc_flag==='socom').length
@@ -806,7 +744,6 @@ function AbmModal({asset,flights,onClose}) {
   )
 }
 
-// ── Aircraft category grouping ────────────────────────────
 const AC_CATEGORIES = {
   'Strategic Bomber': { icon:'💣', color:'#e85040', order:1 },
   'Fighter':          { icon:'⚡', color:'#e85040', order:2 },
@@ -828,11 +765,9 @@ function AircraftTab({ aircraftTypes }) {
     <div style={{padding:20,...Z,fontSize:10,color:C.t3}}>No deployed aircraft data on file for this base.</div>
   )
 
-  // Group by category, filter out pure cargo (only show if category isn't just "Strategic Airlift" for cargo bases)
   const grouped = {}
   aircraftTypes.forEach((ac, i) => {
     const role = ac.role || 'Other'
-    // Determine category key
     let cat = 'Other'
     if (role.includes('Bomber')) cat = 'Strategic Bomber'
     else if (role.includes('Fighter')) cat = 'Fighter'
@@ -863,7 +798,6 @@ function AircraftTab({ aircraftTypes }) {
         const isOpen = expanded === cat
         return (
           <div key={cat} style={{marginBottom:8}}>
-            {/* Category header */}
             <div onClick={() => setExpanded(isOpen ? null : cat)}
               style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
                 background:isOpen?`${meta.color}18`:C.bg3,
@@ -878,7 +812,6 @@ function AircraftTab({ aircraftTypes }) {
                 <span style={{...Z,fontSize:9,color:C.t2}}>{isOpen?'▲':'▼'}</span>
               </div>
             </div>
-            {/* Expanded: individual aircraft types */}
             {isOpen && (
               <div style={{border:`1px solid ${meta.color}40`,borderTop:'none',background:'rgba(0,0,0,.2)'}}>
                 {acs.map((ac, j) => (
@@ -927,7 +860,6 @@ function AircraftTypeRow({ ac, color }) {
   )
 }
 
-// Normalise callsign: "REACH 1234" / "REACH1234" → "RCH1234"
 function normCallsign(cs) {
   if (!cs) return '—'
   return cs.replace(/^REACH\s*/i, 'RCH').toUpperCase()
