@@ -1,10 +1,30 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
+
+// Error boundary — catches React crashes and shows message instead of black screen
+class ErrorBoundary extends React.Component {
+  state = { error: null }
+  static getDerivedStateFromError(e) { return { error: e } }
+  render() {
+    if (this.state.error) return (
+      <div style={{background:'#07090b',color:'#e85040',padding:40,fontFamily:'monospace',height:'100%',display:'flex',flexDirection:'column',gap:12}}>
+        <div style={{fontSize:14,fontWeight:700,letterSpacing:2}}>⚠ RENDER ERROR — MAP VIEW</div>
+        <div style={{fontSize:11,color:'#b8ccd8'}}>{this.state.error.message}</div>
+        <div style={{fontSize:10,color:'#4a6070',marginTop:8}}>Open browser console (F12) for full stack trace.</div>
+        <button onClick={()=>this.setState({error:null})} 
+          style={{marginTop:16,padding:'8px 24px',background:'transparent',border:'1px solid #39e0a0',color:'#39e0a0',cursor:'pointer',fontFamily:'monospace',fontSize:12}}>
+          RETRY
+        </button>
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 const Z = { fontFamily: "'Share Tech Mono', monospace" }
 const R = { fontFamily: "'Rajdhani', sans-serif" }
@@ -47,14 +67,11 @@ const ICAO_COORDS = {
   LGEL:[38.065,23.556], LGSA:[35.531,24.147], LCRT:[46.125,23.886],
   LIPA:[46.031,12.596], LTAG:[37.002,35.426], EGVA:[51.682,-1.790],
   EGUL:[52.409,0.560], EGUN:[52.362,0.486],
-  // Extended CONUS origins appearing in data
-  KCHS:[32.899,-80.041], KBHM:[33.563,-86.756],
-  KCVS:[34.668,-99.267], KNXX:[40.199,-75.148], KCOS:[38.806,-104.701],
-  KSSC:[33.973,-80.471], KWRB:[32.640,-83.591], KSKA:[47.615,-117.656],
-  KGRK:[31.067,-97.829],
-  // Pacific/overseas origins
+  // Additional origins
+  KBHM:[33.563,-86.756], KNXX:[40.199,-75.148], KCOS:[38.806,-104.701],
+  // Pacific/overseas
   RJTY:[35.748,139.348], RJSM:[40.703,141.368],
-  // Canada/Atlantic transit points
+  // Canada/Atlantic transit
   CYQX:[48.936,-54.568], CYYR:[53.303,-60.426], KPSM:[43.078,-70.823],
 }
 
@@ -268,6 +285,7 @@ export function MapView({ auth }) {
   const routeLines = showRoutes ? flights.filter(f=>ICAO_COORDS[f.base]&&ICAO_COORDS[f.destination]) : []
 
   return (
+    <ErrorBoundary>
     <div style={{flex:1,display:'grid',gridTemplateColumns:'260px 1fr 310px',overflow:'hidden'}}>
 
       {/* ── LEFT PANEL ── */}
@@ -450,6 +468,7 @@ export function MapView({ auth }) {
 
       {abmAsset && <AbmModal asset={abmAsset} flights={flights} onClose={()=>setAbmAsset(null)} />}
     </div>
+    </ErrorBoundary>
   )
 }
 
