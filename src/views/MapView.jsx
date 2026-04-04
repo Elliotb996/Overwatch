@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
+import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
 
 const Z = { fontFamily: "'Share Tech Mono', monospace" }
@@ -46,6 +47,15 @@ const ICAO_COORDS = {
   LGEL:[38.065,23.556], LGSA:[35.531,24.147], LCRT:[46.125,23.886],
   LIPA:[46.031,12.596], LTAG:[37.002,35.426], EGVA:[51.682,-1.790],
   EGUL:[52.409,0.560], EGUN:[52.362,0.486],
+  // Extended CONUS origins appearing in data
+  KCHS:[32.899,-80.041], KBHM:[33.563,-86.756],
+  KCVS:[34.668,-99.267], KNXX:[40.199,-75.148], KCOS:[38.806,-104.701],
+  KSSC:[33.973,-80.471], KWRB:[32.640,-83.591], KSKA:[47.615,-117.656],
+  KGRK:[31.067,-97.829],
+  // Pacific/overseas origins
+  RJTY:[35.748,139.348], RJSM:[40.703,141.368],
+  // Canada/Atlantic transit points
+  CYQX:[48.936,-54.568], CYYR:[53.303,-60.426], KPSM:[43.078,-70.823],
 }
 
 const STATIC_ASSETS = [
@@ -127,6 +137,13 @@ const STATIC_ASSETS = [
      {type:'EA-37B Compass Call',qty:'2x (departed)',role:'EW — departed to Souda Bay 2 Apr',tails:['AE17CD 19-1587 (AXIS 41)','AE142E 17-5579 (AXIS 43)']},
    ],
    intel:'41+ MC-130J staged through since 3 Mar. Aircraft arriving 0000-0400z unmarked/tail numbers taped. Most with 20+ PAX inbound. 11 confirmed Silent Knight EW-mod aircraft. Callsign patterns: UNLIT/BLATE/AGREE/PILUM/SWASH/DACHA/LAPEL. SWASH 09 grounded (bird strike 23 Mar). Mass departure 25-26 Mar. USMC KC-130 from Miramar also present.',tags:['SURGE','MC-130J','SILENT-KNIGHT','AFSOC','OP-EPIC-FURY']},
+  // Staging / transit bases
+  {id:'fjdg',name:'Diego Garcia NSF',sub:'FJDG // British Indian Ocean Territory',country:'US',type:'airbase',status:'ACTIVE',lat:-7.3132,lng:72.4108,arrCnt:0,socomCnt:0,
+   aircraftTypes:[{type:'B-52H / B-1B (rotational)',qty:'surge capable',role:'Strategic Bomber'},{type:'P-8A Poseidon',qty:'rotational',role:'ISR/MPA'},{type:'C-17A',qty:'transit',role:'Pre-position Staging'}],
+   intel:'Major pre-positioning hub. 18+ C-17 missions routing FJDG→OJMS/OEPS/HDAM confirmed. Watson-class LMSR pre-positioned. Critical CENTCOM logistics node.',tags:['CENTCOM','PRE-POSITION','DIEGO-GARCIA']},
+  {id:'etad',name:'Spangdahlem AB',sub:'ETAD // Germany',country:'US',type:'airbase',status:'ACTIVE',lat:49.972,lng:6.693,arrCnt:0,socomCnt:0,
+   aircraftTypes:[{type:'C-17A Globemaster III',qty:'transit/staging',role:'Strategic Airlift'},{type:'F-16C Fighting Falcon',qty:'52nd FW organic',role:'Fighter'}],
+   intel:'Army-Z mission staging node — PMZ/JMZ/AMZ series route via ETAD en route to OKAS/OJMS. Several CORONET support missions staged here.',tags:['EUCOM','ARMY-Z','STAGING']},
   // Events
   {id:'ev001',name:'Op EPIC FURY — Iran',sub:'CENTCOM // ONGOING',country:'US',type:'strike',status:'ONGOING',lat:32.0,lng:53.0,notes:'8000+ targets struck. 120+ Iranian vessels sunk. B-52H/B-1B/F-18/Tomahawk.',tags:['OP-EPIC-FURY','IRAN']},
   {id:'ev002',name:'Houthi Suppression',sub:'OIR // ONGOING',country:'US',type:'strike',status:'ONGOING',lat:15.5,lng:43.5,notes:'CVN-72 sustained ops. Tomahawk confirmed.',tags:['OIR','HOUTHI']},
@@ -159,7 +176,19 @@ const CONUS_META = {
   KMDT:{name:'Middletown PANG',unit:'193rd SOW (ANG)',region:'Harrisburg, PA'},
   KWRI:{name:'McGuire AFB',unit:'305th AMW (AMC)',region:'NJ'},
   KGSB:{name:'Seymour Johnson AFB',unit:'4th FW — F-15E',region:'Goldsboro, NC'},
-  KLSF:{name:'Lawson AAF',unit:'Fort Moore Army Airfield',region:'Fort Moore, GA'},
+  KLSF:{name:'Lawson AAF',unit:'Fort Moore / 1st Cavalry area',region:'Fort Moore, GA'},
+  KCHS:{name:'Charleston AFB',unit:'437th AW — C-17',region:'Charleston, SC'},
+  KBHM:{name:'Birmingham ANGB',unit:'117th ARW — KC-135',region:'Birmingham, AL'},
+  KBOI:{name:'Gowen Field ANGB',unit:'124th FW — A-10C',region:'Boise, ID'},
+  KCVS:{name:'Altus AFB',unit:'97th AMW (AETC) — KC-46',region:'Altus, OK'},
+  KNXX:{name:'NAS Willow Grove (NASJRB)',unit:'Naval Reserve / P-8 det',region:'Willow Grove, PA'},
+  KCOS:{name:'Peterson SFB',unit:'Space Command / 21st SW',region:'Colorado Springs, CO'},
+  KSSC:{name:'Shaw AFB',unit:'20th FW — F-16C',region:'Sumter, SC'},
+  KWRB:{name:'Robins AFB',unit:'78th ABW / WR-ALC',region:'Warner Robins, GA'},
+  KSKA:{name:'Fairchild AFB',unit:'92nd ARW — KC-135/KC-46',region:'Spokane, WA'},
+  KGRK:{name:'Gray AAF / Fort Cavazos',unit:'III Corps / 1st Cavalry Division',region:'Killeen, TX'},
+  KDOV:{name:'Dover AFB',unit:'436th AW — C-17/C-5',region:'Dover, DE'},
+  KSUU:{name:'Travis AFB',unit:'60th AMW — C-17/C-5',region:'Fairfield, CA'},
 }
 
 const FEED_ITEMS = [
@@ -181,6 +210,33 @@ function FlyTo({ target }) {
 
 export function MapView({ auth }) {
   const { flights, byBase, byDest, loading } = useFlights({ limit: 2000 })
+  const { assets: dbAssets, loading: assetsLoading } = useAssets()
+
+  // Merge DB assets with static fallback - DB takes priority for positions/status
+  const allDbAssets = dbAssets.length > 0 ? dbAssets.map(a => ({
+    id: a.icao_code?.toLowerCase() || a.id,
+    name: a.name,
+    sub: a.designation,
+    country: a.country?.trim(),
+    type: a.asset_type,
+    status: a.status,
+    lat: parseFloat(a.lat),
+    lng: parseFloat(a.lng),
+    arrCnt: a.arr_count || 0,
+    socomCnt: a.socom_count || 0,
+    hull: a.hull_number,
+    csg: a.csg_designation,
+    intel: a.intel_assessment,
+    notes: a.notes,
+    loc: a.last_location,
+    lastRpt: a.last_report_date,
+    centcom: a.centcom_relevance,
+    cat: a.lmsr_category || (a.asset_type === 'lmsr' ? 'forward' : null),
+    tags: a.tags || [],
+    aircraftTypes: STATIC_ASSETS.find(s => 
+      s.id === (a.icao_code?.toLowerCase() || a.id) || s.sub === a.designation
+    )?.aircraftTypes || [],
+  })) : STATIC_ASSETS
   const [layers, setLayers] = useState({ carriers:true, destroyers:true, subs:true, lmsr:true, airbases:true, conus:true, strikes:true })
   const [country, setCountry]   = useState('ALL')
   const [selAsset, setSelAsset] = useState(null)
@@ -200,8 +256,8 @@ export function MapView({ auth }) {
     return () => supabase.removeChannel(ch)
   }, [])
 
-  const allAssets = [...STATIC_ASSETS, ...LMSR_DATA.map(s=>({...s,type:'lmsr'}))]
-  const filtered  = allAssets.filter(a => country==='ALL' || a.country===country || a.type==='lmsr')
+  const allAssets = allDbAssets
+  const filtered  = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr' || a.type==='lmsr')
 
   function selectAsset(a) { setSelAsset(a); setSelCor(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
   function selectCoronet(c) { setSelCor(selCor?.id===c.id?null:c); setSelAsset(null) }
@@ -269,7 +325,7 @@ export function MapView({ auth }) {
           ))}
 
           {/* Airbases */}
-          {layers.airbases && STATIC_ASSETS.filter(a=>a.type==='airbase'&&(country==='ALL'||a.country===country)).map(a=>{
+          {layers.airbases && allAssets.filter(a=>a.type==='airbase'&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
             const col=a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g
             return (
               <Marker key={a.id} position={[a.lat,a.lng]}
@@ -292,7 +348,7 @@ export function MapView({ auth }) {
 
           {/* CONUS departures — same marker style */}
           {layers.conus && Object.entries(byBase).map(([icao,data])=>{
-            const coords=ICAO_COORDS[icao]; if(!coords) return null
+            if(!CONUS_META[icao]) return null  // Only show actual CONUS bases - not ETAR, LIPA, FJDG etc
             const meta=CONUS_META[icao]||{}
             return (
               <Marker key={icao+'_c'} position={coords}
@@ -309,16 +365,16 @@ export function MapView({ auth }) {
             )
           })}
 
-          {layers.carriers && STATIC_ASSETS.filter(a=>a.type==='carrier'&&(country==='ALL'||a.country===country)).map(a=>(
+          {layers.carriers && allAssets.filter(a=>a.type==='carrier'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🚢',a.status==='REFIT'?C.t3:C.b,28,a.status==='DEPLOYED')} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.destroyers && STATIC_ASSETS.filter(a=>a.type==='destroyer'&&(country==='ALL'||a.country===country)).map(a=>(
+          {layers.destroyers && allAssets.filter(a=>a.type==='destroyer'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('⚓',C.b,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.subs && STATIC_ASSETS.filter(a=>a.type==='submarine'&&(country==='ALL'||a.country===country)).map(a=>(
+          {layers.subs && allAssets.filter(a=>a.type==='submarine'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🔵',C.p,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.lmsr && LMSR_DATA.map(s=>{
+          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr').map(s=>{
             const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
             return (
               <Marker key={s.id} position={[s.lat,s.lng]} icon={mkIcon('🚛',col,22,s.cat==='forward')}
@@ -333,7 +389,7 @@ export function MapView({ auth }) {
               </Marker>
             )
           })}
-          {layers.strikes && STATIC_ASSETS.filter(a=>a.type==='strike'&&(country==='ALL'||a.country===country)).map(a=>(
+          {layers.strikes && allAssets.filter(a=>a.type==='strike'&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('⚡',C.r,24,true)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
         </MapContainer>
@@ -668,10 +724,14 @@ function DBlk({label,value,large,highlight}) {
 
 function AbmModal({asset,flights,onClose}) {
   const [tab,setTab] = useState('OVERVIEW')
-  const icao = asset.sub?.split('//')[0]?.trim().toUpperCase() || asset.id?.toUpperCase()
-  // For both CONUS and AOR: match inbound (destination) and outbound (base)
-  const inbound  = flights.filter(f => f.destination===icao || f.destination===asset.id?.toUpperCase())
-  const outbound = flights.filter(f => f.base===icao || f.base===asset.id?.toUpperCase())
+  // Derive all possible ICAO codes for this asset
+  // asset.id is lowercase ('otbh'), asset.sub is 'OTBH // Qatar', flights use uppercase
+  const icaoFromSub = asset.sub?.split('//')[0]?.trim().toUpperCase()
+  const icaoFromId  = asset.id?.toUpperCase()
+  const icaoCodes   = [...new Set([icaoFromSub, icaoFromId].filter(Boolean))]
+  // Match flights against any of the derived codes
+  const inbound  = flights.filter(f => icaoCodes.includes(f.destination?.toUpperCase()))
+  const outbound = flights.filter(f => icaoCodes.includes(f.base?.toUpperCase()))
   const socomIn  = inbound.filter(f=>f.mc_flag==='socom').length
   const tabs = ['OVERVIEW','ARRIVALS (INBOUND)','DEPARTURES (OUTBOUND)','AIRCRAFT','INTEL']
 
