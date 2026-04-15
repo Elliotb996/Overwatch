@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
+import React, { useState, useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, GeoJSON } from 'react-leaflet'
+import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
@@ -15,7 +16,7 @@ class ErrorBoundary extends React.Component {
         <div style={{fontSize:14,fontWeight:700,letterSpacing:2}}>⚠ RENDER ERROR — MAP VIEW</div>
         <div style={{fontSize:11,color:'#b8ccd8'}}>{this.state.error.message}</div>
         <div style={{fontSize:10,color:'#4a6070',marginTop:8}}>Open browser console (F12) for full stack trace.</div>
-        <button onClick={()=>this.setState({error:null})} 
+        <button onClick={()=>this.setState({error:null})}
           style={{marginTop:16,padding:'8px 24px',background:'transparent',border:'1px solid #39e0a0',color:'#39e0a0',cursor:'pointer',fontFamily:'monospace',fontSize:12}}>
           RETRY
         </button>
@@ -31,6 +32,17 @@ const C = {
   g:'#39e0a0', a:'#f0a040', r:'#e85040', b:'#50a0e8', p:'#a060e8',
   y:'#e8d040', t1:'#b8ccd8', t2:'#4a6070', t3:'#28404c', tb:'#dceaf0',
   bg:'#07090b', bg2:'#0c1018', bg3:'#101620', bg4:'#161e28', br:'#1e2c3a', br2:'#273a4c',
+}
+
+// GeoJSON country layer escalation colours
+const ESC_GEO = {
+  CRITICAL:{ fill:'#e85040', stroke:'#e85040', fo:0.18, so:0.75 },
+  SURGE:   { fill:'#e85040', stroke:'#e85040', fo:0.18, so:0.75 },
+  HIGH:    { fill:'#f0a040', stroke:'#f0a040', fo:0.14, so:0.65 },
+  ELEVATED:{ fill:'#e8d040', stroke:'#e8d040', fo:0.10, so:0.55 },
+  ACTIVE:  { fill:'#50a0e8', stroke:'#50a0e8', fo:0.10, so:0.45 },
+  MODERATE:{ fill:'#50a0e8', stroke:'#50a0e8', fo:0.08, so:0.35 },
+  WATCH:   { fill:'#28404c', stroke:'#4a6070', fo:0.05, so:0.20 },
 }
 
 function mkIcon(emoji, color, size=26, pulse=false, badge=null) {
@@ -196,19 +208,21 @@ function FlyTo({ target }) {
 }
 
 export function MapView({ auth }) {
+  const navigate = useNavigate()
   const { flights, byBase, byDest, loading } = useFlights({ limit: 2000 })
   const { assets: dbAssets, loading: assetsLoading } = useAssets()
 
-  // MAPPING LOGIC: Fixes the missing aircraft bug!
+  // GeoJSON country layer state
+  const [countryGeo, setCountryGeo] = useState(null)
+  const [countryIntel, setCountryIntel] = useState([])
+  const geoKey = useRef(0)
+
   const allDbAssets = dbAssets.length > 0 ? dbAssets.map(a => {
-    // 1. Try to find a match in our static library to pull the rich aircraft data
-    const staticMatch = STATIC_ASSETS.find(s => 
-      (a.icao_code && s.id.toLowerCase() === a.icao_code.toLowerCase()) || 
+    const staticMatch = STATIC_ASSETS.find(s =>
+      (a.icao_code && s.id.toLowerCase() === a.icao_code.toLowerCase()) ||
       (a.name && s.name.toLowerCase() === a.name?.toLowerCase()) ||
       (a.designation && s.sub === a.designation)
     )
-
-    // 2. Fallback to any custom strings you type into the Admin Panel
     let dbAc = []
     if (Array.isArray(a.aircraft_types) && a.aircraft_types.length > 0) {
       if (typeof a.aircraft_types[0] === 'object') {
@@ -217,42 +231,34 @@ export function MapView({ auth }) {
         dbAc = a.aircraft_types.map(t => ({ type: t, qty: 'Present', role: 'Logged Asset' }))
       }
     }
-
     return {
       id: a.icao_code?.toLowerCase() || a.id,
-      name: a.name,
-      sub: a.designation,
-      country: a.country?.trim(),
-      type: a.asset_type,
-      status: a.status,
+      name: a.name, sub: a.designation, country: a.country?.trim(),
+      type: a.asset_type, status: a.status,
       lat: a.lat != null ? parseFloat(a.lat) : null,
       lng: a.lng != null ? parseFloat(a.lng) : null,
-      arrCnt: a.arr_count || 0,
-      socomCnt: a.socom_count || 0,
-      hull: a.hull_number,
-      csg: a.csg_designation,
-      intel: a.intel_assessment,
-      notes: a.notes,
-      loc: a.last_location,
-      lastRpt: a.last_report_date,
+      arrCnt: a.arr_count || 0, socomCnt: a.socom_count || 0,
+      hull: a.hull_number, csg: a.csg_designation,
+      intel: a.intel_assessment, notes: a.notes,
+      loc: a.last_location, lastRpt: a.last_report_date,
       centcom: a.centcom_relevance,
       cat: a.lmsr_category || (a.asset_type === 'lmsr' ? 'forward' : null),
       tags: a.tags || [],
-      // Use the rich static data if matched, otherwise use the admin panel strings!
       aircraftTypes: staticMatch?.aircraftTypes?.length > 0 ? staticMatch.aircraftTypes : dbAc,
     }
   }) : STATIC_ASSETS
 
   const [layers, setLayers] = useState({ carriers:true, destroyers:true, subs:true, lmsr:true, airbases:true, conus:true, strikes:true })
-  const [country, setCountry]   = useState('ALL')
+  const [country, setCountry] = useState('ALL')
   const [selAsset, setSelAsset] = useState(null)
-  const [selCor, setSelCor]     = useState(null)
+  const [selCor, setSelCor] = useState(null)
   const [flyTarget, setFlyTarget] = useState(null)
   const [abmAsset, setAbmAsset] = useState(null)
   const [liveFeeds, setLiveFeeds] = useState([])
   const [showRoutes, setShowRoutes] = useState(false)
 
   useEffect(() => {
+    // SIGACT feed subscription
     supabase.from('sigact_feed').select('*').order('created_at',{ascending:false}).limit(15)
       .then(({data}) => setLiveFeeds(data||[]))
     const ch = supabase.channel('feed_live')
@@ -262,16 +268,56 @@ export function MapView({ auth }) {
     return () => supabase.removeChannel(ch)
   }, [])
 
+  useEffect(() => {
+    // Load GeoJSON country boundaries + country intel for layer styling
+    fetch('/countries-tracked.geojson')
+      .then(r => r.json())
+      .then(data => setCountryGeo(data))
+      .catch(e => console.warn('GeoJSON load failed:', e))
+
+    supabase.from('country_intel').select('code,escalation,name,has_strike_sites')
+      .then(({ data }) => {
+        setCountryIntel(data || [])
+        geoKey.current = geoKey.current + 1
+      })
+  }, [])
+
   const allAssets = allDbAssets
-  const filtered  = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr')
+  const filtered = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr')
 
   function selectAsset(a) { setSelAsset(a); setSelCor(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
   function selectCoronet(c) { setSelCor(selCor?.id===c.id?null:c); setSelAsset(null) }
 
-  const naval    = filtered.filter(a=>['carrier','destroyer','submarine'].includes(a.type)).length
-  const bases    = filtered.filter(a=>a.type==='airbase').length
+  const naval = filtered.filter(a=>['carrier','destroyer','submarine'].includes(a.type)).length
+  const bases = filtered.filter(a=>a.type==='airbase').length
   const socomCnt = flights.filter(f=>f.mc_flag==='socom').length
   const routeLines = showRoutes ? flights.filter(f=>ICAO_COORDS[f.base]&&ICAO_COORDS[f.destination]) : []
+
+  // GeoJSON layer style + interaction functions
+  function geoStyle(feature) {
+    const intel = countryIntel.find(c => c.code === feature.properties.code)
+    if (!intel) return { fillOpacity:0, opacity:0, weight:0, interactive:false }
+    const e = ESC_GEO[intel.escalation] || ESC_GEO.WATCH
+    return { fillColor:e.fill, fillOpacity:e.fo, color:e.stroke, weight:1.5, opacity:e.so }
+  }
+
+  function onEachFeature(feature, layer) {
+    const intel = countryIntel.find(c => c.code === feature.properties.code)
+    if (!intel) { layer.options.interactive = false; return }
+    const e = ESC_GEO[intel.escalation] || ESC_GEO.WATCH
+    layer.on({
+      mouseover: ev => { ev.target.setStyle({ fillOpacity: e.fo * 2.8, weight: 2.5, opacity: 1 }); ev.target.bringToFront() },
+      mouseout:  ev => ev.target.setStyle({ fillOpacity: e.fo, weight: 1.5, opacity: e.so }),
+      click:     ()  => navigate(`/country/${feature.properties.code}`)
+    })
+    layer.bindTooltip(
+      `<div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#dceaf0;background:rgba(7,9,11,.95);border:1px solid ${e.stroke};padding:5px 12px;border-radius:2px;letter-spacing:1px;pointer-events:none">
+        ${intel.name || feature.properties.name}
+        <span style="font-size:9px;color:${e.stroke};margin-left:8px;letter-spacing:2px">${intel.escalation}</span>
+      </div>`,
+      { sticky: true, opacity: 1, className: 'ow-country-tip' }
+    )
+  }
 
   return (
     <ErrorBoundary>
@@ -313,11 +359,23 @@ export function MapView({ auth }) {
 
       {/* ── MAP ── */}
       <div style={{position:'relative',overflow:'hidden'}}>
+        <style>{`.ow-country-tip { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; }`}</style>
         <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             subdomains="abcd" maxZoom={18}
           />
+
+          {/* ── GeoJSON Country Layer — clickable, coloured by escalation ── */}
+          {countryGeo && countryIntel.length > 0 && (
+            <GeoJSON
+              key={geoKey.current}
+              data={countryGeo}
+              style={geoStyle}
+              onEachFeature={onEachFeature}
+            />
+          )}
+
           <FlyTo target={flyTarget} />
 
           {selCor && (() => {
@@ -343,8 +401,12 @@ export function MapView({ auth }) {
                     <div style={{...R,fontSize:14,fontWeight:700,color:C.tb,marginBottom:4}}>{a.name}</div>
                     <div style={{color:col,marginBottom:2}}>▲{a.arrCnt||0} arrivals tracked</div>
                     {a.socomCnt>0&&<div style={{color:C.p,marginBottom:4}}>SOCOM: {a.socomCnt}</div>}
+                    <button onClick={()=>{ window.location.href=`/airbase/${a.id.toUpperCase()}` }}
+                      style={{display:'block',width:'100%',marginTop:6,padding:'5px',...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.b}`,background:'rgba(80,160,232,.08)',color:C.b,cursor:'pointer'}}>
+                      → AIRBASE VIEW
+                    </button>
                     <button onClick={()=>{selectAsset(a);setAbmAsset(a)}}
-                      style={{display:'block',width:'100%',marginTop:6,padding:'5px',...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.a}`,background:'rgba(240,160,64,.08)',color:C.a,cursor:'pointer'}}>
+                      style={{display:'block',width:'100%',marginTop:4,padding:'5px',...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.a}`,background:'rgba(240,160,64,.08)',color:C.a,cursor:'pointer'}}>
                       ▼ EXPAND DETAIL
                     </button>
                   </div>
@@ -383,7 +445,7 @@ export function MapView({ auth }) {
           {layers.subs && allAssets.filter(a=>a.type==='submarine' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🔵',C.p,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr' && a.lat != null && a.lng != null ).map(s=>{
+          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr' && a.lat != null && a.lng != null).map(s=>{
             const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
             return (
               <Marker key={s.id} position={[s.lat,s.lng]} icon={mkIcon('🚛',col,22,s.cat==='forward')}
@@ -419,6 +481,9 @@ export function MapView({ auth }) {
               <div style={{...R,fontSize:16,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
             </div>
           ))}
+          <div style={{padding:'5px 14px',marginLeft:'auto',...Z,fontSize:9,color:C.t3,display:'flex',alignItems:'center',gap:6}}>
+            {countryIntel.length > 0 && <span style={{color:C.g}}>● {countryIntel.length} countries tracked</span>}
+          </div>
         </div>
       </div>
 
@@ -426,7 +491,7 @@ export function MapView({ auth }) {
       <div style={{background:C.bg2,borderLeft:`1px solid ${C.br}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <PH title="Asset Detail" badge={selAsset?.name?.slice(0,18)||selCor?.callsign?.slice(0,14)||null} bc={C.t2} bb="transparent" />
         <div style={{flex:1,overflowY:'auto'}}>
-          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} />
+          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} />
           : selCor   ? <CorDetail cor={selCor} />
           : <EmptyDetail />}
         </div>
@@ -453,7 +518,7 @@ export function MapView({ auth }) {
         {auth?.isAdmin&&<span style={{...Z,fontSize:9,color:C.r,marginLeft:'auto',letterSpacing:1}}>● ADMIN MODE</span>}
       </div>
 
-      {abmAsset && <AbmModal asset={abmAsset} flights={flights} onClose={()=>setAbmAsset(null)} />}
+      {abmAsset && <AbmModal asset={abmAsset} flights={flights} onClose={()=>setAbmAsset(null)} navigate={navigate} />}
     </div>
     </ErrorBoundary>
   )
@@ -518,7 +583,7 @@ function AListItem({asset,sel,onClick}) {
   )
 }
 
-function ADetail({asset,onExpand,flights}) {
+function ADetail({asset,onExpand,flights,navigate}) {
   const stCol={DEPLOYED:C.g,ACTIVE:C.g,SURGE:C.r,ELEVATED:C.a,ONGOING:C.r,REFIT:C.t3}[asset.status]||C.t2
   const [selAc, setSelAc] = useState(null)
 
@@ -589,7 +654,7 @@ function ADetail({asset,onExpand,flights}) {
         {asset.type==='airbase' ? (
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
             <SBox value={asset.arrCnt||0} label="ARRIVALS" color={C.a} />
-            <SBox value={asset.type==='airbase'?'tracked':'—'} label="DEPARTURES" color={C.b} />
+            <SBox value="tracked" label="DEPARTURES" color={C.b} />
             <SBox value={asset.socomCnt||0} label="SOCOM" color={C.p} />
           </div>
         ) : (
@@ -638,34 +703,15 @@ function ADetail({asset,onExpand,flights}) {
 
       {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
       {asset.type==='airbase'&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
+        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`,display:'flex',flexDirection:'column',gap:4}}>
+          <button onClick={()=>navigate(`/airbase/${asset.id.toUpperCase()}`)}
+            style={{display:'block',width:'100%',padding:6,...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.b}`,background:'rgba(80,160,232,.08)',color:C.b,cursor:'pointer'}}>
+            → FULL AIRBASE VIEW
+          </button>
           <button onClick={onExpand}
             style={{display:'block',width:'100%',padding:6,...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.a}`,background:'rgba(240,160,64,.08)',color:C.a,cursor:'pointer'}}>
-            ▼ EXPAND — FLIGHTS / AIRCRAFT / INTEL
+            ▼ EXPAND DETAIL
           </button>
-        </div>
-      )}
-      {asset.escorts?.length>0&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>BATTLE GROUP</div>
-          {asset.escorts.map((e,i)=>(
-            <div key={i} style={{display:'flex',gap:10,marginBottom:5}}>
-              <span style={{...R,color:C.b,width:130,fontWeight:600,fontSize:12}}>{e.name}</span>
-              <span style={{...Z,fontSize:9,color:C.t2}}>{e.sub}</span>
-              <span style={{...R,color:C.t2,marginLeft:'auto',fontSize:10}}>{e.role}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {asset.sightings?.length>0&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>SIGHTINGS</div>
-          {asset.sightings.map((s,i)=>(
-            <div key={i} style={{marginBottom:8,padding:'7px 10px',background:C.bg,borderLeft:`2px solid ${C.b}`}}>
-              <div style={{...Z,fontSize:9,color:C.t3,marginBottom:3}}>{s.dt} // {s.src}</div>
-              <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{s.txt}</div>
-            </div>
-          ))}
         </div>
       )}
       {asset.tags?.length>0&&(
@@ -700,8 +746,9 @@ function CorDetail({cor}) {
 function EmptyDetail() {
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:200,color:C.t3,...Z,fontSize:11,letterSpacing:2,gap:10,textAlign:'center',padding:20}}>
-      <div style={{fontSize:24,opacity:.2}}>◎</div><div>SELECT ASSET</div>
-      <div style={{fontSize:9,color:'#1a2a34'}}>OR CORONET MISSION</div>
+      <div style={{fontSize:24,opacity:.2}}>◎</div>
+      <div>SELECT ASSET</div>
+      <div style={{fontSize:9,color:'#1a2a34'}}>HOVER COUNTRY TO NAVIGATE</div>
     </div>
   )
 }
@@ -724,7 +771,7 @@ function DBlk({label,value,large,highlight}) {
   )
 }
 
-function AbmModal({asset,flights,onClose}) {
+function AbmModal({asset,flights,onClose,navigate}) {
   const [tab,setTab] = useState('OVERVIEW')
   const icaoFromSub = asset.sub?.split('//')[0]?.trim().toUpperCase()
   const icaoFromId  = asset.id?.toUpperCase()
@@ -748,6 +795,10 @@ function AbmModal({asset,flights,onClose}) {
             <div style={{...Z,fontSize:9,color:C.t2,letterSpacing:1}}>{l}</div>
           </div>
         ))}
+        <button onClick={()=>navigate(`/airbase/${asset.id.toUpperCase()}`)}
+          style={{padding:'0 16px',borderLeft:`1px solid ${C.br}`,background:'rgba(80,160,232,.08)',color:C.b,cursor:'pointer',...R,fontSize:11,fontWeight:600,letterSpacing:1,border:'none',borderLeft:`1px solid ${C.br}`}}>
+          → FULL PAGE
+        </button>
         <div onClick={onClose} style={{width:48,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:C.t2,cursor:'pointer',borderLeft:`1px solid ${C.br}`}}>✕</div>
       </div>
       <div style={{display:'flex',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0,overflowX:'auto'}}>
@@ -773,9 +824,7 @@ function AbmModal({asset,flights,onClose}) {
         {(tab==='ARRIVALS (INBOUND)'||tab==='DEPARTURES (OUTBOUND)')&&(
           <FlightTable flights={tab.includes('INBOUND')?inbound:outbound} label={tab.includes('INBOUND')?'inbound':'outbound'} intel={asset.intel} />
         )}
-        {tab==='AIRCRAFT'&&(
-          <AircraftTab aircraftTypes={asset.aircraftTypes} />
-        )}
+        {tab==='AIRCRAFT'&&<AircraftTab aircraftTypes={asset.aircraftTypes} />}
         {tab==='INTEL'&&(
           <div style={{padding:'14px 18px',...Z,fontSize:10,color:C.t1,lineHeight:1.8}}>
             {asset.intel||'No intel assessment on file.'}
@@ -795,20 +844,18 @@ const AC_CATEGORIES = {
   'ISR':              { icon:'🔭', color:'#50a0e8', order:6 },
   'Tanker':           { icon:'⛽', color:'#39e0a0', order:7 },
   'SOCOM Airlift':    { icon:'🔒', color:'#a060e8', order:8 },
-  'SOCOM Assault/Infiltration':{ icon:'🔒', color:'#a060e8', order:8 },
+  'SOCOM Assault/Infiltration': { icon:'🔒', color:'#a060e8', order:8 },
   'Gunship':          { icon:'💥', color:'#e85040', order:9 },
   'Strategic Airlift':{ icon:'✈', color:'#4a6070', order:10 },
 }
 
 function AircraftTab({ aircraftTypes }) {
   const [expanded, setExpanded] = useState(null)
-
   if (!aircraftTypes?.length) return (
-    <div style={{padding:20,...Z,fontSize:10,color:C.t3}}>No deployed aircraft data on file for this base.</div>
+    <div style={{padding:20,...Z,fontSize:10,color:C.t3}}>No deployed aircraft data on file.</div>
   )
-
   const grouped = {}
-  aircraftTypes.forEach((ac, i) => {
+  aircraftTypes.forEach(ac => {
     const role = ac.role || 'Other'
     let cat = 'Other'
     if (role.includes('Bomber')) cat = 'Strategic Bomber'
@@ -823,42 +870,26 @@ function AircraftTab({ aircraftTypes }) {
     else if (role.includes('SOCOM')) cat = 'SOCOM Airlift'
     else if (role.includes('Airlift')) cat = 'Strategic Airlift'
     if (!grouped[cat]) grouped[cat] = []
-    grouped[cat].push({ ...ac, _idx: i })
+    grouped[cat].push(ac)
   })
-
-  const sortedCats = Object.entries(grouped).sort((a,b) =>
-    (AC_CATEGORIES[a[0]]?.order||99) - (AC_CATEGORIES[b[0]]?.order||99)
-  )
-
+  const sortedCats = Object.entries(grouped).sort((a,b) => (AC_CATEGORIES[a[0]]?.order||99) - (AC_CATEGORIES[b[0]]?.order||99))
   return (
     <div style={{padding:'14px 18px'}}>
-      <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:12}}>
-        DEPLOYED AIRCRAFT — click category or type for individual airframes
-      </div>
       {sortedCats.map(([cat, acs]) => {
         const meta = AC_CATEGORIES[cat] || { icon:'✈', color:C.t2 }
         const isOpen = expanded === cat
         return (
           <div key={cat} style={{marginBottom:8}}>
             <div onClick={() => setExpanded(isOpen ? null : cat)}
-              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
-                background:isOpen?`${meta.color}18`:C.bg3,
-                border:`1px solid ${isOpen?meta.color+'60':C.br}`,
-                borderRadius:1,cursor:'pointer'}}>
+              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:isOpen?`${meta.color}18`:C.bg3,border:`1px solid ${isOpen?meta.color+'60':C.br}`,borderRadius:1,cursor:'pointer'}}>
               <span style={{fontSize:16}}>{meta.icon}</span>
               <span style={{...R,fontSize:13,fontWeight:700,color:C.tb,flex:1}}>{cat}</span>
-              <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <span style={{...Z,fontSize:11,color:meta.color,fontWeight:700}}>
-                  {acs.length} type{acs.length>1?'s':''}
-                </span>
-                <span style={{...Z,fontSize:9,color:C.t2}}>{isOpen?'▲':'▼'}</span>
-              </div>
+              <span style={{...Z,fontSize:11,color:meta.color,fontWeight:700}}>{acs.length} type{acs.length>1?'s':''}</span>
+              <span style={{...Z,fontSize:9,color:C.t2}}>{isOpen?'▲':'▼'}</span>
             </div>
             {isOpen && (
               <div style={{border:`1px solid ${meta.color}40`,borderTop:'none',background:'rgba(0,0,0,.2)'}}>
-                {acs.map((ac, j) => (
-                  <AircraftTypeRow key={j} ac={ac} color={meta.color} />
-                ))}
+                {acs.map((ac, j) => <AircraftTypeRow key={j} ac={ac} color={meta.color} />)}
               </div>
             )}
           </div>
@@ -873,19 +904,13 @@ function AircraftTypeRow({ ac, color }) {
   return (
     <div style={{borderBottom:`1px solid rgba(30,44,58,.4)`}}>
       <div onClick={() => ac.tails?.length && setShowTails(v=>!v)}
-        style={{display:'flex',alignItems:'center',gap:12,padding:'8px 16px',
-          cursor:ac.tails?.length?'pointer':'default',
-          background:showTails?'rgba(80,160,232,.06)':'transparent'}}>
+        style={{display:'flex',alignItems:'center',gap:12,padding:'8px 16px',cursor:ac.tails?.length?'pointer':'default',background:showTails?'rgba(80,160,232,.06)':'transparent'}}>
         <div style={{flex:1}}>
           <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{ac.type}</div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{...Z,fontSize:16,fontWeight:700,color:color,lineHeight:1}}>{ac.qty}</div>
-          {ac.tails?.length>0&&(
-            <div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>
-              {showTails?'▲ hide':'▼ '+ ac.tails.length +' airframes'}
-            </div>
-          )}
+          <div style={{...Z,fontSize:16,fontWeight:700,color,lineHeight:1}}>{ac.qty}</div>
+          {ac.tails?.length>0&&<div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>{showTails?'▲ hide':'▼ '+ac.tails.length+' airframes'}</div>}
         </div>
       </div>
       {showTails && ac.tails?.length>0&&(
@@ -916,7 +941,7 @@ function FlightTable({flights,label,intel}) {
   return (
     <div>
       <div style={{padding:'6px 12px',background:C.bg4,borderBottom:`1px solid ${C.br}`,...Z,fontSize:9,color:C.t2}}>
-        ← {flights.length} {label} tracked · ORIGIN codes = ICAO departure base · HEX = ICAO Mode-S transponder
+        ← {flights.length} {label} tracked
       </div>
       <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:11,minWidth:700}}>
