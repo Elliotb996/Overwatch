@@ -1,17 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
-import { AuthGate }      from './components/AuthGate'
-import { Header }        from './components/Header'
-import { MapView }       from './views/MapView'
-import { ConusView }     from './views/ConusView'
-import { SealiftView }   from './views/SealiftView'
-import { CountryView }   from './views/CountryView'
-import { AirbaseView }   from './views/AirbaseView'
-import { AdminLayout }   from './admin/AdminLayout'
-import { FlightEditor }  from './admin/FlightEditor'
-import { UnitManager }   from './admin/UnitManager'
-import { AssetEditor }   from './admin/AssetEditor'
-import { CoronetEditor } from './admin/CoronetEditor'
+import { AuthGate }       from './components/AuthGate'
+import { Header }         from './components/Header'
+import { MapView }        from './views/MapView'
+import { ConusView }      from './views/ConusView'
+import { SealiftView }    from './views/SealiftView'
+import { CountryView }    from './views/CountryView'
+import { AirbaseView }    from './views/AirbaseView'
+import { AdminLayout }    from './admin/AdminLayout'
+import { FlightEditor }   from './admin/FlightEditor'
+import { UnitManager }    from './admin/UnitManager'
+import { AssetEditor }    from './admin/AssetEditor'
+import { CoronetEditor }  from './admin/CoronetEditor'
+import { CountryEditor }  from './admin/CountryEditor'
 
 export default function App() {
   const auth = useAuth()
@@ -46,11 +47,12 @@ export default function App() {
             <Route path="/admin" element={
               auth.isAdmin ? <AdminLayout auth={auth} /> : <Navigate to="/" replace />
             }>
-              <Route index              element={<Navigate to="flights" replace />} />
-              <Route path="flights"     element={<FlightEditor />} />
-              <Route path="units"       element={<UnitManager />} />
-              <Route path="assets"      element={<AssetEditor />} />
-              <Route path="coronets"    element={<CoronetEditor />} />
+              <Route index               element={<Navigate to="flights" replace />} />
+              <Route path="flights"      element={<FlightEditor />} />
+              <Route path="units"        element={<UnitManager />} />
+              <Route path="assets"       element={<AssetEditor />} />
+              <Route path="coronets"     element={<CoronetEditor />} />
+              <Route path="countries"    element={<CountryEditor />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
