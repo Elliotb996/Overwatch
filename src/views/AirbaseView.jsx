@@ -375,33 +375,235 @@ function AirfieldMapTab({asset,auth}) {
   )
 }
 
-function ImageryTab({images,code,auth}) {
+function ImageryTab({images:initImages,code,auth}) {
+  const [images, setImages] = useState(initImages||[])
+  const [uploading, setUploading] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [selImg, setSelImg] = useState(null)
+  const [form, setForm] = useState({
+    label:'', description:'', source:'Satellite', captured_date:'',
+    tier_required:'premium', geo_confirmed:false, file:null, preview:null
+  })
+  const [msg, setMsg] = useState(null)
+
+  function flash(m, err=false) { setMsg({text:m,err}); setTimeout(()=>setMsg(null),4000) }
+
+  async function reload() {
+    const {data} = await supabase.from('imagery_meta').select('*')
+      .eq('asset_id',code).eq('asset_type','airbase').order('created_at',{ascending:false})
+    setImages(data||[])
+  }
+
+  function onFile(e) {
+    const file = e.target.files?.[0]
+    if(!file) return
+    const preview = URL.createObjectURL(file)
+    setForm(f=>({...f,file,preview}))
+  }
+
+  async function upload() {
+    if(!form.file||!form.label) { flash('Label and image are required',true); return }
+    setUploading(true)
+    const ext = form.file.name.split('.').pop()
+    const path = `airbases/${code}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage.from('imagery').upload(path, form.file, {upsert:true})
+    if(upErr) { flash('Upload failed: '+upErr.message,true); setUploading(false); return }
+    const { data: urlData } = supabase.storage.from('imagery').getPublicUrl(path)
+    const { error: dbErr } = await supabase.from('imagery_meta').insert({
+      asset_id: code, asset_type:'airbase',
+      label: form.label, description: form.description,
+      source: form.source, captured_date: form.captured_date||null,
+      storage_path: path, image_url: urlData.publicUrl,
+      geo_confirmed: form.geo_confirmed,
+      tier_required: form.tier_required,
+    })
+    setUploading(false)
+    if(dbErr) { flash('Metadata save failed: '+dbErr.message,true); return }
+    flash('Image uploaded successfully')
+    setShowForm(false)
+    setForm({label:'',description:'',source:'Satellite',captured_date:'',tier_required:'premium',geo_confirmed:false,file:null,preview:null})
+    reload()
+  }
+
+  async function deleteImg(img) {
+    if(!confirm('Delete this image?')) return
+    if(img.storage_path) await supabase.storage.from('imagery').remove([img.storage_path])
+    await supabase.from('imagery_meta').delete().eq('id',img.id)
+    setSelImg(null)
+    reload()
+  }
+
+  const inp={width:'100%',padding:'8px 10px',background:C.bg2,border:`1px solid ${C.br}`,color:C.t1,fontFamily:"'Share Tech Mono',monospace",fontSize:11,borderRadius:1,outline:'none',boxSizing:'border-box'}
+
   return (
-    <div style={{flex:1,overflow:'auto',padding:20}}>
-      <TierGate required="premium" current={auth?.tier||'free'}>
-        {images.length===0?(
-          <div style={{textAlign:'center',padding:40,...Z,fontSize:10,color:C.t3}}>
-            <div style={{fontSize:28,marginBottom:12,opacity:.3}}>🛰</div>
-            No imagery catalogued for {code}.<br/>
-            <span style={{fontSize:9,color:C.t3,marginTop:8,display:'block'}}>
-              Upload satellite imagery or airfield charts via admin panel.<br/>
-              Airfield charts: check AIP (Aeronautical Information Publication) for country.
-            </span>
-          </div>
-        ):(
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12}}>
-            {images.map(img=>(
-              <div key={img.id} style={{background:C.bg3,border:`1px solid ${C.br}`,borderRadius:2,overflow:'hidden'}}>
-                <div style={{height:130,background:'#0c1018',display:'flex',alignItems:'center',justifyContent:'center',...Z,fontSize:9,color:C.t3}}>[IMAGERY]</div>
-                <div style={{padding:'8px 10px'}}>
-                  <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{img.label}</div>
-                  <div style={{...Z,fontSize:9,color:C.t2}}>{img.captured_date} · {img.source}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      {/* Toolbar */}
+      <div style={{padding:'8px 16px',background:C.bg4,borderBottom:`1px solid ${C.br}`,display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+        <span style={{...Z,fontSize:9,color:C.t2}}>{images.length} image{images.length!==1?'s':''} catalogued for {code}</span>
+        {msg&&<span style={{...Z,fontSize:9,color:msg.err?C.r:C.g,marginLeft:8}}>{msg.text}</span>}
+        {auth?.isAdmin&&!showForm&&(
+          <button onClick={()=>setShowForm(true)}
+            style={{...R,fontSize:11,fontWeight:700,letterSpacing:2,padding:'4px 16px',
+              background:'rgba(57,224,160,.12)',border:`1px solid ${C.g}`,color:C.g,
+              cursor:'pointer',marginLeft:'auto',borderRadius:1}}>
+            + UPLOAD IMAGERY
+          </button>
         )}
-      </TierGate>
+        {auth?.isAdmin&&showForm&&(
+          <button onClick={()=>setShowForm(false)}
+            style={{...Z,fontSize:10,padding:'4px 12px',background:'transparent',border:`1px solid ${C.br}`,color:C.t2,cursor:'pointer',marginLeft:'auto'}}>
+            ✕ CANCEL
+          </button>
+        )}
+      </div>
+
+      {/* Upload form */}
+      {showForm&&auth?.isAdmin&&(
+        <div style={{flexShrink:0,borderBottom:`1px solid ${C.br}`,background:C.bg2,padding:20,display:'grid',gridTemplateColumns:'200px 1fr',gap:16}}>
+          {/* Image preview / file picker */}
+          <div>
+            <div style={{...Z,fontSize:8,color:C.t3,marginBottom:6,letterSpacing:2}}>SELECT IMAGE</div>
+            <label style={{display:'block',cursor:'pointer'}}>
+              <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}} />
+              <div style={{width:'100%',paddingBottom:'75%',position:'relative',background:C.bg3,border:`2px dashed ${form.preview?C.g:C.br}`,borderRadius:2,overflow:'hidden'}}>
+                {form.preview ? (
+                  <img src={form.preview} alt="preview" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}} />
+                ) : (
+                  <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6}}>
+                    <span style={{fontSize:24,opacity:.3}}>🛰</span>
+                    <span style={{...Z,fontSize:8,color:C.t3}}>Click to select</span>
+                  </div>
+                )}
+              </div>
+            </label>
+            {form.file&&<div style={{...Z,fontSize:8,color:C.t2,marginTop:4,wordBreak:'break-all'}}>{form.file.name}</div>}
+          </div>
+
+          {/* Metadata fields */}
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div>
+                <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>LABEL / TITLE *</div>
+                <input value={form.label} onChange={e=>setForm(f=>({...f,label:e.target.value}))} placeholder="Ovda AB — Ramp West 14 Apr 2026" style={inp} />
+              </div>
+              <div>
+                <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>CAPTURED DATE</div>
+                <input type="date" value={form.captured_date} onChange={e=>setForm(f=>({...f,captured_date:e.target.value}))} style={inp} />
+              </div>
+              <div>
+                <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>SOURCE</div>
+                <select value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))} style={inp}>
+                  {['Satellite','Planet Labs','Maxar','Sentinel-2','OSINT','ArmchairAdml','Social Media','Other'].map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>TIER ACCESS</div>
+                <select value={form.tier_required} onChange={e=>setForm(f=>({...f,tier_required:e.target.value}))} style={inp}>
+                  <option value="analyst">Analyst</option>
+                  <option value="premium">Premium</option>
+                  <option value="admin">Admin Only</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>DESCRIPTION / WRITE-UP</div>
+              <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+                rows={3} placeholder="What does this image show? Any notable activity, aircraft, construction, damage assessment..."
+                style={{...inp,resize:'vertical',lineHeight:1.7}} />
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:16}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+                <input type="checkbox" checked={form.geo_confirmed} onChange={e=>setForm(f=>({...f,geo_confirmed:e.target.checked}))} />
+                <span style={{...Z,fontSize:9,color:form.geo_confirmed?C.g:C.t2}}>GEO-CONFIRMED</span>
+              </label>
+              <button onClick={upload} disabled={uploading||!form.file||!form.label}
+                style={{...R,fontSize:12,fontWeight:700,letterSpacing:2,padding:'8px 24px',
+                  background:uploading||!form.file||!form.label?C.br:C.g,
+                  color:C.bg,border:'none',cursor:'pointer',borderRadius:1,marginLeft:'auto'}}>
+                {uploading?'UPLOADING...':'UPLOAD IMAGE'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gallery / Detail split */}
+      <div style={{flex:1,overflow:'hidden',display:'flex'}}>
+        <TierGate required="analyst" current={auth?.tier||'free'}>
+          {images.length===0&&!showForm?(
+            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12}}>
+              <span style={{fontSize:32,opacity:.2}}>🛰</span>
+              <div style={{...Z,fontSize:10,color:C.t3}}>No imagery catalogued for {code}</div>
+              {auth?.isAdmin&&<button onClick={()=>setShowForm(true)} style={{...Z,fontSize:9,color:C.g,background:'transparent',border:`1px solid ${C.g}44`,padding:'5px 14px',cursor:'pointer',borderRadius:1}}>+ UPLOAD FIRST IMAGE</button>}
+            </div>
+          ):(
+            <>
+              {/* Thumbnail grid */}
+              <div style={{width:selImg?280:undefined,flex:selImg?undefined:1,borderRight:selImg?`1px solid ${C.br}`:undefined,overflow:'auto',padding:12,display:'flex',flexWrap:'wrap',alignContent:'flex-start',gap:8}}>
+                {images.map(img=>(
+                  <div key={img.id} onClick={()=>setSelImg(selImg?.id===img.id?null:img)}
+                    style={{width:selImg?112:200,cursor:'pointer',borderRadius:2,overflow:'hidden',
+                      border:`2px solid ${selImg?.id===img.id?C.a:C.br}`,
+                      background:C.bg3,transition:'border-color .15s'}}>
+                    {img.image_url?(
+                      <img src={img.image_url} alt={img.label} style={{width:'100%',height:selImg?84:130,objectFit:'cover',display:'block'}} />
+                    ):(
+                      <div style={{width:'100%',height:selImg?84:130,display:'flex',alignItems:'center',justifyContent:'center',...Z,fontSize:9,color:C.t3}}>NO URL</div>
+                    )}
+                    <div style={{padding:'6px 8px'}}>
+                      <div style={{...R,fontSize:selImg?10:12,fontWeight:600,color:C.tb,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{img.label}</div>
+                      <div style={{...Z,fontSize:8,color:C.t2}}>{img.captured_date||'Date unknown'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Detail panel */}
+              {selImg&&(
+                <div style={{flex:1,overflow:'auto'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
+                    <div style={{flex:1}}>
+                      <div style={{...R,fontSize:15,fontWeight:700,color:C.tb}}>{selImg.label}</div>
+                      <div style={{...Z,fontSize:9,color:C.t2}}>{selImg.source} · {selImg.captured_date||'Date unknown'}</div>
+                    </div>
+                    {selImg.geo_confirmed&&<span style={{...Z,fontSize:9,color:C.g,border:`1px solid ${C.g}44`,padding:'2px 6px',borderRadius:1}}>✓ GEO</span>}
+                    <a href={selImg.image_url} target="_blank" rel="noopener noreferrer"
+                      style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>↗ FULL RES</a>
+                    {auth?.isAdmin&&(
+                      <button onClick={()=>deleteImg(selImg)}
+                        style={{...Z,fontSize:9,color:C.r,background:'transparent',border:`1px solid ${C.r}44`,padding:'4px 8px',cursor:'pointer',borderRadius:1}}>🗑 DELETE</button>
+                    )}
+                  </div>
+                  {selImg.image_url&&(
+                    <a href={selImg.image_url} target="_blank" rel="noopener noreferrer">
+                      <img src={selImg.image_url} alt={selImg.label}
+                        style={{width:'100%',maxHeight:380,objectFit:'contain',background:'#000',display:'block',cursor:'zoom-in'}} />
+                    </a>
+                  )}
+                  {selImg.description&&(
+                    <div style={{padding:'16px 20px',borderTop:`1px solid ${C.br}`}}>
+                      <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:8}}>ASSESSMENT / NOTES</div>
+                      <div style={{...Z,fontSize:11,color:C.t1,lineHeight:1.9}}>{selImg.description}</div>
+                    </div>
+                  )}
+                  <div style={{padding:'12px 20px',borderTop:`1px solid ${C.br}`,display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                    {[
+                      {l:'SOURCE',v:selImg.source||'—'},
+                      {l:'CAPTURED',v:selImg.captured_date||'Unknown'},
+                      {l:'ACCESS',v:(selImg.tier_required||'analyst').toUpperCase()},
+                    ].map(({l,v})=>(
+                      <div key={l} style={{padding:'8px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
+                        <div style={{...Z,fontSize:8,color:C.t3,marginBottom:3}}>{l}</div>
+                        <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </TierGate>
+      </div>
     </div>
   )
 }
