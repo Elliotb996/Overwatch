@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, GeoJSON } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, GeoJSON, useMapEvents } from 'react-leaflet'
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -84,11 +84,18 @@ const ICAO_COORDS = {
 const STATIC_ASSETS = [
   {id:'cvn78',name:'USS Gerald R. Ford',sub:'CVN-78 // Ford-class',country:'US',type:'carrier',status:'DEPLOYED',lat:43.5,lng:16.5,csg:'CSG-12',
    aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'},{type:'EA-18G Growler',qty:'5x',role:'EW'},{type:'E-2D Hawkeye',qty:'4x',role:'AEW&C'},{type:'MH-60R Seahawk',qty:'8x',role:'ASW/SAR'}],
+   squadrons:['VFA-37 (F/A-18E)','VFA-213 (F/A-18F)','VFA-31 (F/A-18E)','VFA-87 (F/A-18E)','VAQ-142 (EA-18G)','VAW-124 (E-2D)','HSC-9 (MH-60S)','HSM-70 (MH-60R)','VRC-40 (C-2A)'],
+   escorts:[{name:'USS Mitscher',sub:'DDG-57',role:'Destroyer'},{name:'USS Mahan',sub:'DDG-72',role:'Destroyer'},{name:'USS Winston S. Churchill',sub:'DDG-81',role:'Destroyer'},{name:'USS Bainbridge',sub:'DDG-96',role:'Destroyer'},{name:'USNS Supply',sub:'T-AOE-6',role:'Combat Logistics'}],
    notes:'Adriatic/Split Croatia area 28 Mar. EUCOM/CENTCOM direction.',tags:['ADRIATIC','CENTCOM-BOUND']},
   {id:'cvn72',name:'USS Abraham Lincoln',sub:'CVN-72 // Nimitz-class',country:'US',type:'carrier',status:'DEPLOYED',lat:16.0,lng:54.0,csg:'CSG-3',
    aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'},{type:'EA-18G Growler',qty:'5x',role:'EW'},{type:'E-2D Hawkeye',qty:'4x',role:'AEW&C'}],
+   squadrons:['VFA-41 (F/A-18F)','VFA-14 (F/A-18E)','VMFA-314 (F/A-18E)','VFA-151 (F/A-18E)','VAQ-133 (EA-18G)','VAW-117 (E-2D)','HSC-14 (MH-60S)','HSM-71 (MH-60R)','VRM-30 Det.2 (CMV-22B)'],
+   escorts:[{name:'USS Pinckney',sub:'DDG-91',role:'Destroyer'},{name:'USS Spruance',sub:'DDG-111',role:'Destroyer'},{name:'USS Michael Murphy',sub:'DDG-112',role:'Destroyer'},{name:'USS Frank E. Petersen Jr.',sub:'DDG-121',role:'Destroyer'}],
    notes:'5th Fleet / Arabian Sea. Houthi suppression. Tomahawk employment confirmed.',tags:['5TH-FLEET','ARABIAN-SEA']},
   {id:'cvn77',name:'USS George H.W. Bush',sub:'CVN-77 // Nimitz-class',country:'US',type:'carrier',status:'DEPLOYED',lat:36.0,lng:-12.0,csg:'CSG-10',
+   aircraftTypes:[{type:'F/A-18E/F Super Hornet',qty:'24x',role:'Strike'},{type:'EA-18G Growler',qty:'5x',role:'EW'},{type:'E-2D Hawkeye',qty:'4x',role:'AEW&C'}],
+   squadrons:['VFA-103 (F/A-18F)','VFA-83 (F/A-18E)','VFA-131 (F/A-18E)','VFA-105 (F/A-18E)','VAQ-140 (EA-18G)','VAW-121 (E-2D)','HSC-5 (MH-60S)','HSM-79 (MH-60R)','VRM-40 (CMV-22B)'],
+   escorts:[{name:'USS Ross',sub:'DDG-71',role:'Destroyer'},{name:'USS Donald Cook',sub:'DDG-75',role:'Destroyer'},{name:'USS Mason',sub:'DDG-87',role:'Destroyer'},{name:'USNS Arctic',sub:'T-AOE-8',role:'Combat Logistics'}],
    notes:'DEPLOYED 31 Mar. Atlantic transit, EUCOM/CENTCOM direction.',tags:['ATLANTIC','EUCOM-BOUND']},
   {id:'r08',name:'HMS Queen Elizabeth',sub:'R08 // QE-class',country:'UK',type:'carrier',status:'REFIT',lat:56.0,lng:-3.4,csg:'CSG21',
    notes:'Refit Rosyth 482 days. POW also maintenance Portsmouth.',tags:['REFIT','ROSYTH']},
@@ -207,6 +214,11 @@ function FlyTo({ target }) {
   return null
 }
 
+function MapClickClear({ onClear }) {
+  useMapEvents({ click: () => onClear() })
+  return null
+}
+
 export function MapView({ auth }) {
   const navigate = useNavigate()
   const { flights, byBase, byDest, loading } = useFlights({ limit: 2000 })
@@ -245,8 +257,22 @@ export function MapView({ auth }) {
       cat: a.lmsr_category || (a.asset_type === 'lmsr' ? 'forward' : null),
       tags: a.tags || [],
       aircraftTypes: staticMatch?.aircraftTypes?.length > 0 ? staticMatch.aircraftTypes : dbAc,
+      squadrons: staticMatch?.squadrons || [],
+      escorts: staticMatch?.escorts || [],
     }
   }) : STATIC_ASSETS
+
+  // Deduplicate DB assets by id, then add any static assets not covered by DB
+  if(dbAssets.length > 0) {
+    const seenIds = new Set()
+    const deduped = allDbAssets.filter(a => { if(seenIds.has(a.id)) return false; seenIds.add(a.id); return true })
+    const dbIdSet = new Set(deduped.map(a => a.id))
+    const staticExtras = STATIC_ASSETS.filter(s => !dbIdSet.has(s.id))
+    // Replace allDbAssets — use a variable
+    var _finalAssets = [...deduped, ...staticExtras]
+  } else {
+    var _finalAssets = allDbAssets
+  }
 
   // Defaults: only carriers, airbases, events on. Persisted to localStorage.
   const LAYER_DEFAULTS = { carriers:true, destroyers:false, subs:false, lmsr:false, airbases:true, conus:false, strikes:true }
@@ -291,7 +317,7 @@ export function MapView({ auth }) {
       })
   }, [])
 
-  const allAssets = allDbAssets
+  const allAssets = typeof _finalAssets !== 'undefined' ? _finalAssets : allDbAssets
   const filtered = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr')
 
   function selectAsset(a) { setSelAsset(a); setSelCor(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
@@ -363,7 +389,7 @@ export function MapView({ auth }) {
         {/* Asset type quick filter */}
         <div style={{display:'flex',gap:3,padding:'5px 8px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexWrap:'wrap',flexShrink:0}}>
           {[['ALL','ALL'],['naval','⚓ Naval'],['airbase','✈ Bases'],['lmsr','🚛 Sealift'],['strike','⚡ Events'],['conus_base','◄ CONUS']].map(([k,lbl])=>(
-            <button key={k} onClick={()=>setAssetFilter(k)}
+            <button key={k} onClick={()=>setAssetFilter(prev=>prev===k&&k!=='ALL'?'ALL':k)}
               style={{...R,fontSize:9,fontWeight:600,padding:'2px 7px',cursor:'pointer',letterSpacing:0,
                 background:assetFilter===k?'rgba(80,160,232,.15)':'transparent',
                 border:`1px solid ${assetFilter===k?C.b:C.br}`,
@@ -401,6 +427,7 @@ export function MapView({ auth }) {
           )}
 
           <FlyTo target={flyTarget} />
+          <MapClickClear onClear={()=>{ setSelAsset(null); setSelCor(null) }} />
 
           {selCor && (() => {
             const f=ICAO_COORDS[selCor.from], t=ICAO_COORDS[selCor.to]
@@ -736,6 +763,31 @@ function ADetail({asset,onExpand,flights,navigate}) {
             style={{display:'block',width:'100%',padding:6,...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.a}`,background:'rgba(240,160,64,.08)',color:C.a,cursor:'pointer'}}>
             ▼ EXPAND DETAIL
           </button>
+        </div>
+      )}
+      {asset.squadrons?.length>0&&(
+        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>AIR WING</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
+            {asset.squadrons.map((sq,i)=>(
+              <div key={i} style={{...Z,fontSize:9,color:C.t1,padding:'3px 6px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>{sq}</div>
+            ))}
+          </div>
+        </div>
+      )}
+      {asset.escorts?.length>0&&(
+        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>BATTLE GROUP</div>
+          {asset.escorts.map((e,i)=>(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',borderBottom:`1px solid rgba(30,44,58,.3)`}}>
+              <span style={{fontSize:11}}>⚓</span>
+              <div style={{flex:1}}>
+                <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{e.name}</div>
+                <div style={{...Z,fontSize:8,color:C.t2}}>{e.sub}</div>
+              </div>
+              <span style={{...R,fontSize:9,color:C.t3}}>{e.role}</span>
+            </div>
+          ))}
         </div>
       )}
       {asset.tags?.length>0&&(

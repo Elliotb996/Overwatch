@@ -293,6 +293,7 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
 }
 
 function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
+  const navToBase = useNavigate()
   const center = getCountryCenter(code)
   const zoom = getCountryZoom(code)
   return (
@@ -319,9 +320,19 @@ function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
       })}
       {assets.filter(a=>a.lat&&a.lng&&['airbase','carrier','destroyer'].includes(a.asset_type)).map(a=>(
         <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]}
-          icon={mkBaseIcon(a.asset_type==='airbase'?'✈':'🚢', C.b)}>
+          icon={mkBaseIcon(a.asset_type==='airbase'?'✈':'🚢', a.asset_type==='airbase'?C.a:C.b)}
+          eventHandlers={a.asset_type==='airbase'?{click:()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}:{}}>
           <Popup closeButton={false}>
-            <div style={{...Z,fontSize:10}}><div style={{...R,fontSize:12,fontWeight:700,color:C.tb}}>{a.name}</div></div>
+            <div style={{...Z,fontSize:10,minWidth:160}}>
+              <div style={{...R,fontSize:12,fontWeight:700,color:C.tb,marginBottom:4}}>{a.name}</div>
+              <div style={{...Z,fontSize:9,color:C.t2,marginBottom:6}}>{a.designation||a.icao_code}</div>
+              {a.asset_type==='airbase'&&(
+                <div style={{...R,fontSize:10,fontWeight:600,color:C.b,cursor:'pointer',letterSpacing:1}}
+                  onClick={()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}>
+                  → AIRBASE VIEW
+                </div>
+              )}
+            </div>
           </Popup>
         </Marker>
       ))}
