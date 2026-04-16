@@ -214,8 +214,13 @@ function FlyTo({ target }) {
   return null
 }
 
-function MapClickClear({ onClear }) {
-  useMapEvents({ click: () => onClear() })
+function MapClickHandler({ onClear, onReposition, repositioning }) {
+  useMapEvents({
+    click: (e) => {
+      if(repositioning) { onReposition({lat:e.latlng.lat,lng:e.latlng.lng}) }
+      else { onClear() }
+    }
+  })
   return null
 }
 
@@ -285,9 +290,38 @@ export function MapView({ auth }) {
   const [liveFeeds, setLiveFeeds] = useState([])
   const [showRoutes, setShowRoutes] = useState(false)
   const [assetFilter, setAssetFilter] = useState('ALL')
+  const [repositionAsset, setRepositionAsset] = useState(null)
+  const [repositionPos, setRepositionPos] = useState(null)
+  const [repositionSaving, setRepositionSaving] = useState(false)
 
   // Persist layer state
   useEffect(()=>{ try{ localStorage.setItem('ow_layers', JSON.stringify(layers)) }catch{} },[layers])
+
+  async function confirmReposition() {
+    if(!repositionAsset||!repositionPos) return
+    setRepositionSaving(true)
+    const {data:existing} = await supabase.from('assets').select('id').eq('name',repositionAsset.name).maybeSingle()
+    if(existing) {
+      await supabase.from('assets').update({lat:repositionPos.lat,lng:repositionPos.lng}).eq('id',existing.id)
+    } else {
+      await supabase.from('assets').insert({
+        name:repositionAsset.name,asset_type:repositionAsset.type,
+        hull_number:repositionAsset.hull||repositionAsset.sub,
+        lat:repositionPos.lat,lng:repositionPos.lng,
+        status:repositionAsset.status,country:repositionAsset.country
+      })
+    }
+    setRepositionSaving(false)
+    setRepositionAsset(null)
+    setRepositionPos(null)
+  }
+
+  function startReposition(asset) {
+    setRepositionAsset(asset)
+    setRepositionPos({lat:asset.lat,lng:asset.lng})
+    // Fly to asset location
+    if(asset.lat&&asset.lng) setFlyTarget({center:[asset.lat,asset.lng],zoom:5})
+  }
 
   useEffect(() => {
     // SIGACT feed subscription
@@ -424,7 +458,23 @@ export function MapView({ auth }) {
           )}
 
           <FlyTo target={flyTarget} />
-          <MapClickClear onClear={()=>{ setSelAsset(null); setSelCor(null) }} />
+          <MapClickHandler
+            repositioning={!!repositionAsset}
+            onClear={()=>{ setSelAsset(null); setSelCor(null) }}
+            onReposition={(pos)=>setRepositionPos(pos)}
+          />
+          {/* Draggable reposition marker */}
+          {repositionAsset&&repositionPos&&(
+            <Marker
+              position={[repositionPos.lat,repositionPos.lng]}
+              draggable={true}
+              icon={mkIcon(
+                repositionAsset.type==='carrier'?'🚢':repositionAsset.type==='submarine'?'🔵':'⚓',
+                C.a, 32, true
+              )}
+              eventHandlers={{dragend:(e)=>{const p=e.target.getLatLng();setRepositionPos({lat:p.lat,lng:p.lng})}}}
+            />
+          )}
 
           {selCor && (() => {
             const f=ICAO_COORDS[selCor.from], t=ICAO_COORDS[selCor.to]
@@ -484,16 +534,16 @@ export function MapView({ auth }) {
             )
           })}
 
-          {layers.carriers && allAssets.filter(a=>a.type==='carrier' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.carriers && allAssets.filter(a=>a.type==='carrier' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country) && repositionAsset?.id!==a.id).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🚢',a.status==='REFIT'?C.t3:C.b,28,a.status==='DEPLOYED')} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.destroyers && allAssets.filter(a=>a.type==='destroyer' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.destroyers && allAssets.filter(a=>a.type==='destroyer' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country) && repositionAsset?.id!==a.id).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('⚓',C.b,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.subs && allAssets.filter(a=>a.type==='submarine' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country)).map(a=>(
+          {layers.subs && allAssets.filter(a=>a.type==='submarine' && a.lat != null && a.lng != null &&(country==='ALL'||a.country?.trim()===country) && repositionAsset?.id!==a.id).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('🔵',C.p,22)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
-          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr' && a.lat != null && a.lng != null).map(s=>{
+          {layers.lmsr && allAssets.filter(a=>a.type==='lmsr' && a.lat != null && a.lng != null && repositionAsset?.id!==a.id).map(s=>{
             const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
             return (
               <Marker key={s.id} position={[s.lat,s.lng]} icon={mkIcon('🚛',col,22,s.cat==='forward')}
@@ -513,14 +563,36 @@ export function MapView({ auth }) {
           ))}
         </MapContainer>
 
-        <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',zIndex:900,display:'flex',gap:3,background:'rgba(7,9,11,.92)',border:`1px solid ${C.br2}`,padding:5,backdropFilter:'blur(8px)'}}>
-          {Object.keys(VIEWS).map(k=>(
-            <button key={k} onClick={()=>setFlyTarget(VIEWS[k])}
-              style={{...R,fontSize:11,fontWeight:600,letterSpacing:2,padding:'5px 12px',border:`1px solid ${C.br}`,background:'transparent',color:C.t2,cursor:'pointer',textTransform:'uppercase'}}>
-              {k}
+        {/* Reposition confirm bar — replaces view buttons when active */}
+        {repositionAsset ? (
+          <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',zIndex:900,display:'flex',alignItems:'center',gap:10,background:'rgba(7,9,11,.96)',border:`2px solid ${C.a}`,padding:'8px 16px',backdropFilter:'blur(8px)',maxWidth:'90%'}}>
+            <span style={{fontSize:16}}>📍</span>
+            <div style={{...R,fontSize:12,fontWeight:600,color:C.tb,flex:1}}>
+              {repositionAsset.name}
+              <span style={{...Z,fontSize:9,color:C.t2,marginLeft:8}}>
+                {repositionPos?`${repositionPos.lat.toFixed(4)}°N, ${repositionPos.lng.toFixed(4)}°E`:''}
+              </span>
+            </div>
+            <span style={{...Z,fontSize:9,color:C.a}}>Drag marker or click map</span>
+            <button onClick={confirmReposition} disabled={repositionSaving}
+              style={{...R,fontSize:11,fontWeight:700,letterSpacing:1,padding:'6px 18px',background:C.g,color:C.bg,border:'none',cursor:'pointer',borderRadius:1}}>
+              {repositionSaving?'SAVING…':'✓ CONFIRM'}
             </button>
-          ))}
-        </div>
+            <button onClick={()=>{ setRepositionAsset(null); setRepositionPos(null) }}
+              style={{...R,fontSize:11,fontWeight:600,padding:'6px 14px',background:'transparent',border:`1px solid ${C.br}`,color:C.t2,cursor:'pointer',borderRadius:1}}>
+              ✕ CANCEL
+            </button>
+          </div>
+        ) : (
+          <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',zIndex:900,display:'flex',gap:3,background:'rgba(7,9,11,.92)',border:`1px solid ${C.br2}`,padding:5,backdropFilter:'blur(8px)'}}>
+            {Object.keys(VIEWS).map(k=>(
+              <button key={k} onClick={()=>setFlyTarget(VIEWS[k])}
+                style={{...R,fontSize:11,fontWeight:600,letterSpacing:2,padding:'5px 12px',border:`1px solid ${C.br}`,background:'transparent',color:C.t2,cursor:'pointer',textTransform:'uppercase'}}>
+                {k}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={{position:'absolute',top:0,left:0,right:0,zIndex:800,background:'rgba(7,9,11,.88)',borderBottom:`1px solid ${C.br}`,display:'flex',backdropFilter:'blur(6px)'}}>
           {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'SOCOM',v:socomCnt,c:C.p},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.g}].map(({l,v,c})=>(
@@ -539,7 +611,7 @@ export function MapView({ auth }) {
       <div style={{background:C.bg2,borderLeft:`1px solid ${C.br}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <PH title="Asset Detail" badge={selAsset?.name?.slice(0,18)||selCor?.callsign?.slice(0,14)||null} bc={C.t2} bb="transparent" />
         <div style={{flex:1,overflowY:'auto'}}>
-          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} auth={auth} />
+          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} auth={auth} onReposition={auth?.isAdmin?startReposition:null} />
           : selCor   ? <CorDetail cor={selCor} />
           : <EmptyDetail />}
         </div>
@@ -618,7 +690,7 @@ function AListItem({asset,sel,onClick}) {
   )
 }
 
-function ADetail({asset,onExpand,flights,navigate,auth}) {
+function ADetail({asset,onExpand,flights,navigate,auth,onReposition}) {
   const stCol={DEPLOYED:C.g,ACTIVE:C.g,SURGE:C.r,ELEVATED:C.a,ONGOING:C.r,REFIT:C.t3}[asset.status]||C.t2
   const [selAc, setSelAc] = useState(null)
 
@@ -703,8 +775,14 @@ function ADetail({asset,onExpand,flights,navigate,auth}) {
         )}
       </div>
       {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
-      {['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
-        <PositionUpdate asset={asset} auth={auth} />
+      {onReposition&&['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
+        <div style={{padding:'6px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <button onClick={()=>onReposition(asset)}
+            style={{display:'block',width:'100%',padding:'7px',...R,fontSize:11,fontWeight:600,letterSpacing:2,
+              border:`1px solid ${C.a}44`,background:'rgba(240,160,64,.06)',color:C.a,cursor:'pointer',borderRadius:1}}>
+            📍 DRAG TO REPOSITION ON MAP
+          </button>
+        </div>
       )}
       {asset.type==='lmsr'&&asset.loc&&<DBlk label="POSITION" value={`${asset.loc}\nLast report: ${asset.lastRpt}`} />}
 
@@ -896,8 +974,14 @@ function AbmModal({asset,flights,onClose,navigate}) {
             {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
 
             {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
-      {['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
-        <PositionUpdate asset={asset} auth={auth} />
+      {onReposition&&['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
+        <div style={{padding:'6px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <button onClick={()=>onReposition(asset)}
+            style={{display:'block',width:'100%',padding:'7px',...R,fontSize:11,fontWeight:600,letterSpacing:2,
+              border:`1px solid ${C.a}44`,background:'rgba(240,160,64,.06)',color:C.a,cursor:'pointer',borderRadius:1}}>
+            📍 DRAG TO REPOSITION ON MAP
+          </button>
+        </div>
       )}
           </div>
         )}
