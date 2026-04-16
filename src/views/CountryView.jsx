@@ -51,24 +51,36 @@ function TierGate({required,current,children}) {
   )
 }
 
-// ── Country ICAO lookup ──────────────────────────────
 function getCountryICAOs(code) {
   const m={
-    JO:['OJKA','OJMS','OJAQ','OJMF'],IL:['LLOV','LLNV','LLBG','LLHZ'],
-    KW:['OKAS','OKBK'],SA:['OEPS','OERK','OEJN'],QA:['OTBH'],
-    AE:['OMDM','OMAM','OMAD','OMDB'],DE:['ETAR','ETAD','ETNN'],
-    GB:['EGVA','EGUN','EGUL'],GR:['LGEL','LGSA','LGAT'],IT:['LIPA','LIQL'],
-    IR:['OIII','OIKB','OIMM','OICC'],FR:['LFPG','LFML'],
+    JO:['OJKA','OJMS','OJAQ','OJMF'],
+    IL:['LLOV','LLNV','LLBG','LLHZ'],
+    KW:['OKAS','OKBK'],
+    SA:['OEPS','OERK','OEJN'],
+    QA:['OTBH'],
+    AE:['OMDM','OMAM','OMAD','OMDB'],
+    DE:['ETAR','ETAD','ETNN'],
+    GB:['EGVA','EGUN','EGUL'],
+    GR:['LGEL','LGSA','LGAT'],
+    IT:['LIPA','LIQL'],
+    IR:['OIII','OIKB','OIMM','OICC'],
+    FR:['LFPG','LFML'],
+    YE:['OYAA','OYHD'],
+    SY:['OSDI','OSKL'],
   }
   return m[code]||[]
 }
+
 function getCountryCenter(code) {
-  const m={IR:[32.5,53.7],JO:[31.2,36.5],IL:[31.5,35.0],KW:[29.3,47.5],SA:[24.0,45.0],
-    AE:[24.5,54.5],DE:[51.0,10.0],GB:[52.5,0.0],GR:[38.0,23.0],QA:[25.3,51.2],IT:[42.0,12.5],FR:[46.0,2.0]}
+  const m={
+    IR:[32.5,53.7],JO:[31.2,36.5],IL:[31.5,35.0],KW:[29.3,47.5],
+    SA:[24.0,45.0],AE:[24.5,54.5],DE:[51.0,10.0],GB:[52.5,0.0],
+    GR:[38.0,23.0],QA:[25.3,51.2],IT:[42.0,12.5],FR:[46.0,2.0],
+    YE:[15.5,48.0],SY:[35.0,38.0],
+  }
   return m[code]||[30,40]
 }
 
-// ── Main Component ───────────────────────────────────
 export function CountryView({auth}) {
   const {code} = useParams()
   const navigate = useNavigate()
@@ -77,33 +89,45 @@ export function CountryView({auth}) {
   const [assets,setAssets] = useState([])
   const [flights,setFlights] = useState([])
   const [loading,setLoading] = useState(true)
+  const [error,setError] = useState(null)
   const [tab,setTab] = useState('OVERVIEW')
   const [selSite,setSelSite] = useState(null)
   const siteListRef = useRef(null)
 
   useEffect(()=>{
     async function load(){
-      const [{data:intel},{data:sites},{data:assets},{data:flights}] = await Promise.all([
-        supabase.from('country_intel').select('*').eq('code',code.toUpperCase()).single(),
-        supabase.from('strike_sites').select('*').eq('country_code',code.toUpperCase()).order('strike_date',{ascending:false}),
-        supabase.from('assets').select('*').order('asset_type'),
-        supabase.from('amc_flights').select('*').order('dep_date',{ascending:false}).limit(500),
-      ])
-      setIntel(intel)
-      setSites(sites||[])
-      // Filter assets by country
-      const countryIcaos = getCountryICAOs(code.toUpperCase())
-      const countryAssets = (assets||[]).filter(a =>
-        countryIcaos.includes((a.icao_code||'').toUpperCase())
-      )
-      setAssets(countryAssets)
-      setFlights((flights||[]).filter(f=>countryIcaos.includes(f.destination?.toUpperCase())))
-      
+      try {
+        // Use maybeSingle() instead of single() — returns null if no row, never throws
+        const [
+          {data:intel},
+          {data:sites},
+          {data:assets},
+          {data:flights}
+        ] = await Promise.all([
+          supabase.from('country_intel').select('*').eq('code',code.toUpperCase()).maybeSingle(),
+          supabase.from('strike_sites').select('*').eq('country_code',code.toUpperCase()).order('strike_date',{ascending:false}),
+          supabase.from('assets').select('*').order('asset_type'),
+          supabase.from('amc_flights').select('*').order('dep_date',{ascending:false}).limit(500),
+        ])
+        setIntel(intel)
+        setSites(sites||[])
+        const countryIcaos = getCountryICAOs(code.toUpperCase())
+        const countryAssets = (assets||[]).filter(a =>
+          countryIcaos.includes((a.icao_code||'').toUpperCase())
+        )
+        setAssets(countryAssets)
+        setFlights((flights||[]).filter(f=>countryIcaos.includes(f.destination?.toUpperCase())))
+      } catch(e) {
+        console.error('CountryView load error:', e)
+        setError(e.message)
+      } finally {
+        // ALWAYS called — whether success or error
+        setLoading(false)
+      }
     }
     load()
   },[code])
 
-  // Sync selSite to scroll list
   useEffect(()=>{
     if(selSite && siteListRef.current) {
       const el = siteListRef.current.querySelector(`[data-site-id="${selSite.id}"]`)
@@ -111,7 +135,19 @@ export function CountryView({auth}) {
     }
   },[selSite])
 
-  if(loading) return <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:C.bg,...Z,color:C.t2,fontSize:11,letterSpacing:3}}>LOADING INTEL...</div>
+  if(loading) return (
+    <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:C.bg,...Z,color:C.t2,fontSize:11,letterSpacing:3}}>
+      LOADING INTEL...
+    </div>
+  )
+
+  if(error) return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:C.bg,gap:12}}>
+      <div style={{...Z,fontSize:11,color:C.r,letterSpacing:2}}>⚠ LOAD ERROR</div>
+      <div style={{...Z,fontSize:9,color:C.t2}}>{error}</div>
+      <button onClick={()=>navigate('/')} style={{...Z,fontSize:10,color:C.t2,background:'transparent',border:`1px solid ${C.br}`,padding:'6px 16px',cursor:'pointer',marginTop:8}}>← WORLD MAP</button>
+    </div>
+  )
 
   const esc = ESC_COLORS[intel?.escalation||'WATCH']
   const hasStrikeSites = intel?.has_strike_sites === true && sites.length > 0
@@ -119,7 +155,6 @@ export function CountryView({auth}) {
 
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:C.bg}}>
-      {/* Header */}
       <div style={{background:C.bg4,borderBottom:`1px solid ${C.br}`,padding:'0 20px',flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:16,height:52}}>
           <button onClick={()=>navigate('/')}
@@ -133,7 +168,7 @@ export function CountryView({auth}) {
               {intel.escalation}
             </div>
           )}
-          {intel?.threat_window&&!['N/A','N/A - cooperative','Ongoing','N/A - cooperative'].includes(intel.threat_window)&&(
+          {intel?.threat_window&&!['N/A','N/A - cooperative','Ongoing'].includes(intel.threat_window)&&(
             <div style={{...Z,fontSize:9,color:C.a,letterSpacing:1}}>⏱ {intel.threat_window}</div>
           )}
           <div style={{marginLeft:'auto',display:'flex',gap:12,...Z,fontSize:9,color:C.t3}}>
@@ -154,11 +189,10 @@ export function CountryView({auth}) {
         </div>
       </div>
 
-      {/* Content */}
       <div style={{flex:1,overflow:'hidden',display:'flex'}}>
         {tab==='OVERVIEW'&&<OverviewTab intel={intel} sites={sites} assets={assets} flights={flights} auth={auth} navigate={navigate} hasStrikeSites={hasStrikeSites} code={code} selSite={selSite} setSelSite={setSelSite} />}
         {tab==='STRIKE SITES'&&<StrikeSitesTab sites={sites} auth={auth} selSite={selSite} setSelSite={setSelSite} code={code} siteListRef={siteListRef} />}
-        {tab==='ASSETS'&&<AssetsTab assets={assets} auth={auth} navigate={navigate} code={code} />}
+        {tab==='ASSETS'&&<AssetsTab assets={assets} auth={auth} navigate={navigate} />}
         {tab==='FLIGHTS'&&<FlightsTab flights={flights} auth={auth} />}
         {tab==='IMAGERY'&&<ImageryTab assetId={code.toUpperCase()} auth={auth} />}
       </div>
@@ -166,7 +200,6 @@ export function CountryView({auth}) {
   )
 }
 
-// ── Overview Tab ─────────────────────────────────────
 function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,code,selSite,setSelSite}) {
   const airbases = assets.filter(a=>a.asset_type==='airbase')
   const naval = assets.filter(a=>['carrier','destroyer','submarine'].includes(a.asset_type))
@@ -219,7 +252,6 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
           </>
         )}
       </div>
-      {/* Right: map */}
       <div style={{display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'12px 16px',borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
           {hasStrikeSites?'STRIKE SITES & ASSETS':'ASSETS MAP'}
@@ -252,7 +284,6 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
   )
 }
 
-// ── Country Map ──────────────────────────────────────
 function CountryMap({sites,assets,code,selSite,setSelSite}) {
   const center = getCountryCenter(code)
   return (
@@ -266,7 +297,7 @@ function CountryMap({sites,assets,code,selSite,setSelSite}) {
             icon={mkSiteIcon(SITE_ICONS[s.site_type]||'💥', col, isSel)}
             eventHandlers={{click:()=>setSelSite(isSel?null:s)}}>
             <Popup closeButton={false}>
-              <div style={{...Z,fontSize:10,minWidth:180,background:C.bg2,padding:0}}>
+              <div style={{...Z,fontSize:10,minWidth:180}}>
                 <div style={{...R,fontSize:13,fontWeight:700,color:C.tb,marginBottom:3}}>{s.name}</div>
                 <div style={{color:col,marginBottom:3,fontSize:9,letterSpacing:1}}>{s.status} · {s.site_type?.toUpperCase()}</div>
                 {s.geo_confirmed&&<div style={{...Z,fontSize:8,color:C.g,marginBottom:3}}>✓ GEO CONFIRMED</div>}
@@ -289,11 +320,9 @@ function CountryMap({sites,assets,code,selSite,setSelSite}) {
   )
 }
 
-// ── Strike Sites Tab ─────────────────────────────────
 function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
   return (
     <div style={{flex:1,display:'grid',gridTemplateColumns:'320px 1fr',overflow:'hidden'}}>
-      {/* Left: site list */}
       <div ref={siteListRef} style={{borderRight:`1px solid ${C.br}`,overflow:'auto'}}>
         <TierGate required="analyst" current={auth?.tier||'free'}>
           {sites.length===0&&<div style={{...Z,fontSize:10,color:C.t3,padding:20}}>No strike sites logged.</div>}
@@ -324,14 +353,13 @@ function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
           })}
         </TierGate>
       </div>
-      {/* Right: map + detail */}
       <div style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
         {selSite ? (
           <SiteDetail site={selSite} auth={auth} onClose={()=>setSelSite(null)} />
         ) : (
           <>
             <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'10px 14px',borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
-              STRIKE SITES MAP — Click a marker or list item to expand detail
+              STRIKE SITES MAP — Click marker or list item to expand
             </div>
             <TierGate required="analyst" current={auth?.tier||'free'}>
               <div style={{flex:1,minHeight:400}}>
@@ -345,12 +373,10 @@ function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
   )
 }
 
-// ── Site Detail ──────────────────────────────────────
 function SiteDetail({site,auth,onClose}) {
   const sc = SITE_STATUS_COL[site.status]||C.t2
   return (
     <div style={{overflow:'auto',height:'100%'}}>
-      {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
         <span style={{fontSize:22}}>{SITE_ICONS[site.site_type]||'💥'}</span>
         <div style={{flex:1}}>
@@ -361,7 +387,6 @@ function SiteDetail({site,auth,onClose}) {
         <button onClick={onClose} style={{...Z,fontSize:12,color:C.t2,background:'transparent',border:`1px solid ${C.br}`,padding:'4px 8px',cursor:'pointer'}}>✕</button>
       </div>
       <div style={{padding:20}}>
-        {/* Meta grid */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
           {[
             {l:'STRIKE DATE',v:site.strike_date||'Unknown'},
@@ -375,20 +400,14 @@ function SiteDetail({site,auth,onClose}) {
             </div>
           ))}
         </div>
-
-        {/* Geo confirmed badge */}
         {site.geo_confirmed&&(
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'7px 12px',background:'rgba(57,224,160,.08)',border:`1px solid ${C.g}44`,borderRadius:1,marginBottom:12}}>
             <span style={{color:C.g}}>✓</span>
             <span style={{...Z,fontSize:9,color:C.g,letterSpacing:2}}>GEO-CONFIRMED LOCATION</span>
           </div>
         )}
-
-        {/* Assessment */}
         <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>ASSESSMENT</div>
         <div style={{...Z,fontSize:11,color:C.t1,lineHeight:1.9,marginBottom:16}}>{site.description}</div>
-
-        {/* Coordinates — premium gated */}
         <TierGate required="premium" current={auth?.tier||'free'}>
           <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>COORDINATES</div>
           <div style={{padding:'8px 12px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,...Z,fontSize:11,color:C.y,marginBottom:12,fontWeight:700}}>
@@ -396,22 +415,16 @@ function SiteDetail({site,auth,onClose}) {
           </div>
           <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
             <a href={`https://www.google.com/maps?q=${site.lat},${site.lng}&t=k`} target="_blank" rel="noopener noreferrer"
-              style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>
-              ↗ Google Maps
-            </a>
+              style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>↗ Google Maps</a>
             <a href={`https://zoom.earth/#${site.lat},${site.lng},14z`} target="_blank" rel="noopener noreferrer"
-              style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>
-              ↗ Zoom.Earth Satellite
-            </a>
+              style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>↗ Zoom.Earth</a>
           </div>
         </TierGate>
-
-        {/* X Post link */}
         {site.x_url&&(
           <div style={{marginBottom:16}}>
             <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>SOURCE / X POST</div>
             <a href={site.x_url} target="_blank" rel="noopener noreferrer"
-              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none',cursor:'pointer'}}>
+              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none'}}>
               <span style={{fontSize:16}}>𝕏</span>
               <div>
                 <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{site.x_username||'View on X'}</div>
@@ -420,20 +433,16 @@ function SiteDetail({site,auth,onClose}) {
             </a>
           </div>
         )}
-
-        {/* Imagery placeholder */}
         {site.image_url ? (
           <div style={{marginBottom:16}}>
             <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>IMAGERY</div>
             <img src={site.image_url} alt={site.image_label||'Strike imagery'}
               style={{width:'100%',borderRadius:2,border:`1px solid ${C.br}`,maxHeight:300,objectFit:'cover'}} />
-            {site.image_label&&<div style={{...Z,fontSize:8,color:C.t2,marginTop:4}}>{site.image_label}</div>}
           </div>
         ) : (
           <div style={{padding:'16px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textAlign:'center',...Z,fontSize:9,color:C.t3,marginBottom:16}}>
             <div style={{fontSize:18,marginBottom:6,opacity:.3}}>🛰</div>
-            No imagery catalogued for this site.<br/>
-            <span style={{fontSize:8,marginTop:4,display:'block',color:C.t3}}>Add via admin panel → Strike Sites.</span>
+            No imagery catalogued. Add via admin panel.
           </div>
         )}
       </div>
@@ -441,8 +450,7 @@ function SiteDetail({site,auth,onClose}) {
   )
 }
 
-// ── Assets Tab ───────────────────────────────────────
-function AssetsTab({assets,auth,navigate,code}) {
+function AssetsTab({assets,auth,navigate}) {
   const groups={
     airbase:assets.filter(a=>a.asset_type==='airbase'),
     carrier:assets.filter(a=>a.asset_type==='carrier'),
@@ -473,7 +481,6 @@ function AssetsTab({assets,auth,navigate,code}) {
   )
 }
 
-// ── Flights Tab ──────────────────────────────────────
 function FlightsTab({flights,auth}) {
   return (
     <div style={{flex:1,overflow:'auto'}}>
@@ -519,7 +526,6 @@ function FlightsTab({flights,auth}) {
   )
 }
 
-// ── Imagery Tab ──────────────────────────────────────
 function ImageryTab({assetId,auth}) {
   const [images,setImages] = useState([])
   useEffect(()=>{
