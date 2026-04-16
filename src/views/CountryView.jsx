@@ -92,16 +92,13 @@ export function CountryView({auth}) {
       setIntel(intel)
       setSites(sites||[])
       // Filter assets by country
-      const destIcaos = getCountryICAOs(code.toUpperCase())
-      const countryAssets = (assets||[]).filter(a => {
-        const c = a.country?.trim()
-        return c === code.toUpperCase() || 
-          (code.toUpperCase()==='GB' && (c==='US'||c==='GB') && ['EGVA','EGUN','EGUL'].includes(a.icao_code)) ||
-          (code.toUpperCase()==='DE' && c==='US' && ['ETAR','ETAD'].includes(a.icao_code))
-      })
+      const countryIcaos = getCountryICAOs(code.toUpperCase())
+      const countryAssets = (assets||[]).filter(a =>
+        countryIcaos.includes((a.icao_code||'').toUpperCase())
+      )
       setAssets(countryAssets)
-      setFlights((flights||[]).filter(f=>destIcaos.includes(f.destination?.toUpperCase())))
-      setLoading(false)
+      setFlights((flights||[]).filter(f=>countryIcaos.includes(f.destination?.toUpperCase())))
+      
     }
     load()
   },[code])
