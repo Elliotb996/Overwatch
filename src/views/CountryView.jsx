@@ -32,9 +32,10 @@ function mkSiteIcon(emoji, color, selected=false) {
   })
 }
 
-function mkBaseIcon(emoji, color) {
+function mkBaseIcon(emoji, color, label='') {
+  const labelHtml = label ? `<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:rgba(7,9,11,.92);border:1px solid ${color}44;color:${color};font-family:'Share Tech Mono',monospace;font-size:7px;padding:1px 4px;white-space:nowrap;pointer-events:none;letter-spacing:1px">${label}</div>` : ''
   return L.divIcon({
-    html:`<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.88);border:1.5px solid ${color};border-radius:2px;font-size:11px;box-shadow:0 0 8px ${color}44">${emoji}</div>`,
+    html:`<div style="position:relative;width:24px;height:24px">${labelHtml}<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.92);border:1.5px solid ${color};border-radius:2px;font-size:11px;box-shadow:0 0 8px ${color}44">${emoji}</div></div>`,
     className:'',iconSize:[24,24],iconAnchor:[12,12],
   })
 }
@@ -320,7 +321,7 @@ function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
       })}
       {assets.filter(a=>a.lat&&a.lng&&['airbase','carrier','destroyer'].includes(a.asset_type)).map(a=>(
         <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]}
-          icon={mkBaseIcon(a.asset_type==='airbase'?'✈':'🚢', a.asset_type==='airbase'?C.a:C.b)}
+          icon={mkBaseIcon(a.asset_type==='airbase'?'✈':'🚢', a.asset_type==='airbase'?C.a:C.b, a.asset_type==='airbase'?(a.icao_code||'').toUpperCase():'')}
           eventHandlers={a.asset_type==='airbase'?{click:()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}:{}}>
           <Popup closeButton={false}>
             <div style={{...Z,fontSize:10,minWidth:160}}>

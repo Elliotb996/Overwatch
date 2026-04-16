@@ -229,50 +229,47 @@ export function MapView({ auth }) {
   const [countryIntel, setCountryIntel] = useState([])
   const geoKey = useRef(0)
 
-  const allDbAssets = dbAssets.length > 0 ? dbAssets.map(a => {
-    const staticMatch = STATIC_ASSETS.find(s =>
-      (a.icao_code && s.id.toLowerCase() === a.icao_code.toLowerCase()) ||
-      (a.name && s.name.toLowerCase() === a.name?.toLowerCase()) ||
-      (a.designation && s.sub === a.designation)
-    )
-    let dbAc = []
-    if (Array.isArray(a.aircraft_types) && a.aircraft_types.length > 0) {
-      if (typeof a.aircraft_types[0] === 'object') {
-        dbAc = a.aircraft_types
-      } else {
-        dbAc = a.aircraft_types.map(t => ({ type: t, qty: 'Present', role: 'Logged Asset' }))
-      }
-    }
+  // Asset merge: STATIC_ASSETS is the source of truth.
+  // DB data enriches static entries (arr_count, intel, status updates).
+  // Never show both — match by ICAO code or name.
+  const dbByIcao = {}
+  const dbByName = {}
+  ;(dbAssets||[]).forEach(a => {
+    if(a.icao_code) dbByIcao[a.icao_code.toLowerCase()] = a
+    if(a.name) dbByName[a.name.toLowerCase()] = a
+  })
+
+  const allDbAssets = STATIC_ASSETS.map(s => {
+    const db = dbByIcao[s.id] || dbByName[s.name?.toLowerCase()]
+    if(!db) return s
+    // Enrich static with live DB fields
     return {
-      id: a.icao_code?.toLowerCase() || a.id,
+      ...s,
+      status: db.status || s.status,
+      arrCnt: db.arr_count || s.arrCnt || 0,
+      socomCnt: db.socom_count || s.socomCnt || 0,
+      intel: db.intel_assessment || s.intel,
+      lat: db.lat != null ? parseFloat(db.lat) : s.lat,
+      lng: db.lng != null ? parseFloat(db.lng) : s.lng,
+      notes: db.notes || s.notes,
+    }
+  })
+
+  // Add DB assets that have no static match (new entries added via admin)
+  const staticIds = new Set(STATIC_ASSETS.map(s => s.id))
+  const staticNames = new Set(STATIC_ASSETS.map(s => s.name?.toLowerCase()))
+  const dbExtras = (dbAssets||[])
+    .filter(a => !staticIds.has((a.icao_code||'').toLowerCase()) && !staticNames.has(a.name?.toLowerCase()))
+    .map(a => ({
+      id: (a.icao_code||a.id||'').toLowerCase(),
       name: a.name, sub: a.designation, country: a.country?.trim(),
       type: a.asset_type, status: a.status,
-      lat: a.lat != null ? parseFloat(a.lat) : null,
-      lng: a.lng != null ? parseFloat(a.lng) : null,
-      arrCnt: a.arr_count || 0, socomCnt: a.socom_count || 0,
+      lat: a.lat!=null?parseFloat(a.lat):null, lng: a.lng!=null?parseFloat(a.lng):null,
+      arrCnt: a.arr_count||0, socomCnt: a.socom_count||0,
       hull: a.hull_number, csg: a.csg_designation,
-      intel: a.intel_assessment, notes: a.notes,
-      loc: a.last_location, lastRpt: a.last_report_date,
-      centcom: a.centcom_relevance,
-      cat: a.lmsr_category || (a.asset_type === 'lmsr' ? 'forward' : null),
-      tags: a.tags || [],
-      aircraftTypes: staticMatch?.aircraftTypes?.length > 0 ? staticMatch.aircraftTypes : dbAc,
-      squadrons: staticMatch?.squadrons || [],
-      escorts: staticMatch?.escorts || [],
-    }
-  }) : STATIC_ASSETS
-
-  // Deduplicate DB assets by id, then add any static assets not covered by DB
-  if(dbAssets.length > 0) {
-    const seenIds = new Set()
-    const deduped = allDbAssets.filter(a => { if(seenIds.has(a.id)) return false; seenIds.add(a.id); return true })
-    const dbIdSet = new Set(deduped.map(a => a.id))
-    const staticExtras = STATIC_ASSETS.filter(s => !dbIdSet.has(s.id))
-    // Replace allDbAssets — use a variable
-    var _finalAssets = [...deduped, ...staticExtras]
-  } else {
-    var _finalAssets = allDbAssets
-  }
+      intel: a.intel_assessment, notes: a.notes, tags: a.tags||[],
+      aircraftTypes: [], squadrons: [], escorts: [],
+    }))
 
   // Defaults: only carriers, airbases, events on. Persisted to localStorage.
   const LAYER_DEFAULTS = { carriers:true, destroyers:false, subs:false, lmsr:false, airbases:true, conus:false, strikes:true }
@@ -317,7 +314,7 @@ export function MapView({ auth }) {
       })
   }, [])
 
-  const allAssets = typeof _finalAssets !== 'undefined' ? _finalAssets : allDbAssets
+  const allAssets = [...allDbAssets, ...dbExtras]
   const filtered = allAssets.filter(a => country==='ALL' || a.country?.trim()===country || a.type==='lmsr')
 
   function selectAsset(a) { setSelAsset(a); setSelCor(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
@@ -721,7 +718,8 @@ function ADetail({asset,onExpand,flights,navigate}) {
       {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
       {asset.type==='lmsr'&&asset.loc&&<DBlk label="POSITION" value={`${asset.loc}\nLast report: ${asset.lastRpt}`} />}
 
-      {asset.aircraftTypes?.length>0&&(
+      {/* Carriers use AIR WING section below - skip generic aircraft list */}
+      {asset.aircraftTypes?.length>0&&asset.type!=='carrier'&&(
         <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
           <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>AIRCRAFT ON STATION</div>
           {asset.aircraftTypes.map((ac,i)=>(
@@ -753,6 +751,25 @@ function ADetail({asset,onExpand,flights,navigate}) {
       )}
 
       {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
+      {asset.type==='carrier'&&asset.sub&&(
+        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:6}}>EXTERNAL SOURCES</div>
+          {[
+            {id:'cvn78',hull:'CVN-78',path:'cvn78'},
+            {id:'cvn77',hull:'CVN-77',path:'cvn77'},
+            {id:'cvn72',hull:'CVN-72',path:'cvn72'},
+            {id:'r08',hull:'R08',path:null},
+            {id:'r91',hull:'R91',path:null},
+          ].filter(c=>asset.id===c.id&&c.path).map(c=>(
+            <a key={c.hull} href={`https://www.uscarriers.net/${c.path}history.htm`} target="_blank" rel="noopener noreferrer"
+              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none',marginBottom:4}}>
+              <span style={{...Z,fontSize:9,color:C.b}}>↗</span>
+              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>USCarriers.net — {asset.name} History</span>
+              <span style={{...Z,fontSize:8,color:C.t3,marginLeft:'auto'}}>DEPLOYMENT LOG</span>
+            </a>
+          ))}
+        </div>
+      )}
       {asset.type==='airbase'&&(
         <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`,display:'flex',flexDirection:'column',gap:4}}>
           <button onClick={()=>navigate(`/airbase/${asset.id.toUpperCase()}`)}
@@ -894,6 +911,25 @@ function AbmModal({asset,flights,onClose,navigate}) {
               <SBox value={socomIn} label="SOCOM" color={C.p} />
             </div>
             {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
+      {asset.type==='carrier'&&asset.sub&&(
+        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:6}}>EXTERNAL SOURCES</div>
+          {[
+            {id:'cvn78',hull:'CVN-78',path:'cvn78'},
+            {id:'cvn77',hull:'CVN-77',path:'cvn77'},
+            {id:'cvn72',hull:'CVN-72',path:'cvn72'},
+            {id:'r08',hull:'R08',path:null},
+            {id:'r91',hull:'R91',path:null},
+          ].filter(c=>asset.id===c.id&&c.path).map(c=>(
+            <a key={c.hull} href={`https://www.uscarriers.net/${c.path}history.htm`} target="_blank" rel="noopener noreferrer"
+              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none',marginBottom:4}}>
+              <span style={{...Z,fontSize:9,color:C.b}}>↗</span>
+              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>USCarriers.net — {asset.name} History</span>
+              <span style={{...Z,fontSize:8,color:C.t3,marginLeft:'auto'}}>DEPLOYMENT LOG</span>
+            </a>
+          ))}
+        </div>
+      )}
             {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
           </div>
         )}
