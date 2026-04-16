@@ -62,22 +62,27 @@ export function Header({ auth }) {
         }}>{label}</Link>
       ))}
 
-      {/* Spacer */}
       <div style={{ flex: 1 }} />
-
-      {/* Clock */}
       <UTC />
 
-      {/* Auth */}
       <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
         {auth.session ? (
           <>
-            <TierBadge tier={auth.tier} />
-            {auth.isAdmin && (
-              <Link to="/admin" style={{ ...Z, fontSize: 10, letterSpacing: 2, color: '#f0a040', textDecoration: 'none', padding: '3px 8px', border: '1px solid rgba(240,160,64,.3)', background: 'rgba(240,160,64,.05)' }}>
-                ADMIN
+            {/* Show tier badge only for non-admin tiers */}
+            {!auth.isAdmin && <TierBadge tier={auth.tier} />}
+
+            {/* Admin gets a single combined badge that links to admin panel */}
+            {auth.isAdmin ? (
+              <Link to="/admin" style={{
+                ...Z, fontSize: 10, letterSpacing: 2, color: '#f0a040',
+                textDecoration: 'none', padding: '3px 10px',
+                border: '1px solid rgba(240,160,64,.4)',
+                background: 'rgba(240,160,64,.08)',
+              }}>
+                ● ADMIN
               </Link>
-            )}
+            ) : null}
+
             <button onClick={auth.signOut}
               style={{ ...Z, fontSize: 10, letterSpacing: 1, color: '#4a6070', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>
               SIGN OUT
@@ -132,7 +137,7 @@ function LoginModal({ signIn }) {
       {open && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={e => { if (e.target === e.currentTarget) setOpen(false) }}>
-          <div style={{ background: '#0c1018', border: '1px solid #2e3f52', padding: 28, width: 320 }} className="fade-in">
+          <div style={{ background: '#0c1018', border: '1px solid #2e3f52', padding: 28, width: 320 }}>
             <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, letterSpacing: 3, color: '#4a6070', marginBottom: 20 }}>// AUTHENTICATE</div>
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: 2, color: '#4a6070', marginBottom: 4 }}>EMAIL</div>
