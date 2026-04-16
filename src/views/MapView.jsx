@@ -248,7 +248,12 @@ export function MapView({ auth }) {
     }
   }) : STATIC_ASSETS
 
-  const [layers, setLayers] = useState({ carriers:true, destroyers:true, subs:true, lmsr:true, airbases:true, conus:true, strikes:true })
+  // Defaults: only carriers, airbases, events on. Persisted to localStorage.
+  const LAYER_DEFAULTS = { carriers:true, destroyers:false, subs:false, lmsr:false, airbases:true, conus:false, strikes:true }
+  const [layers, setLayers] = useState(()=>{
+    try{ const s=localStorage.getItem('ow_layers'); return s?{...LAYER_DEFAULTS,...JSON.parse(s)}:LAYER_DEFAULTS }
+    catch{ return LAYER_DEFAULTS }
+  })
   const [country, setCountry] = useState('ALL')
   const [selAsset, setSelAsset] = useState(null)
   const [selCor, setSelCor] = useState(null)
@@ -256,6 +261,10 @@ export function MapView({ auth }) {
   const [abmAsset, setAbmAsset] = useState(null)
   const [liveFeeds, setLiveFeeds] = useState([])
   const [showRoutes, setShowRoutes] = useState(false)
+  const [assetFilter, setAssetFilter] = useState('ALL')
+
+  // Persist layer state
+  useEffect(()=>{ try{ localStorage.setItem('ow_layers', JSON.stringify(layers)) }catch{} },[layers])
 
   useEffect(() => {
     // SIGACT feed subscription
@@ -337,7 +346,6 @@ export function MapView({ auth }) {
             {[['carriers','🚢','Carriers'],['destroyers','⚓','Destroyers'],['subs','🔵','Submarines'],['lmsr','🚛','Sealift'],['airbases','✈','AOR Bases'],['conus','◄','CONUS Dep'],['strikes','⚡','Events']].map(([k,ico,lbl])=>(
               <LyrBtn key={k} icon={ico} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
             ))}
-            <LyrBtn icon="—" label="Routes" on={showRoutes} onClick={()=>setShowRoutes(v=>!v)} />
           </div>
         </div>
         <div style={{borderBottom:`1px solid ${C.br}`}}>
@@ -352,8 +360,24 @@ export function MapView({ auth }) {
           </div>
         </div>
         <PH title="Assets" badge={filtered.length} bc={C.b} bb="rgba(80,160,232,.12)" />
+        {/* Asset type quick filter */}
+        <div style={{display:'flex',gap:3,padding:'5px 8px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexWrap:'wrap',flexShrink:0}}>
+          {[['ALL','ALL'],['naval','⚓ Naval'],['airbase','✈ Bases'],['lmsr','🚛 Sealift'],['strike','⚡ Events'],['conus_base','◄ CONUS']].map(([k,lbl])=>(
+            <button key={k} onClick={()=>setAssetFilter(k)}
+              style={{...R,fontSize:9,fontWeight:600,padding:'2px 7px',cursor:'pointer',letterSpacing:0,
+                background:assetFilter===k?'rgba(80,160,232,.15)':'transparent',
+                border:`1px solid ${assetFilter===k?C.b:C.br}`,
+                color:assetFilter===k?C.b:C.t2,borderRadius:1,whiteSpace:'nowrap'}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
         <div style={{flex:1,overflowY:'auto'}}>
-          {filtered.map(a => <AListItem key={a.id} asset={a} sel={selAsset?.id===a.id} onClick={()=>selectAsset(a)} />)}
+          {filtered.filter(a=>{
+            if(assetFilter==='ALL') return true
+            if(assetFilter==='naval') return ['carrier','destroyer','submarine'].includes(a.type)
+            return a.type===assetFilter
+          }).map(a => <AListItem key={a.id} asset={a} sel={selAsset?.id===a.id} onClick={()=>selectAsset(a)} />)}
         </div>
       </div>
 

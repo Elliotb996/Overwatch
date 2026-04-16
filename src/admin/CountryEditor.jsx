@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, useMapEvents, Marker } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
 
 const Z={fontFamily:"'Share Tech Mono',monospace"}
@@ -29,6 +32,40 @@ function Toggle({on,onClick,label}) {
       <span style={{...Z,fontSize:10,color:on?C.g:C.t2,letterSpacing:1}}>{label}</span>
     </div>
   )
+}
+
+// ── Pin Drop Map Component ─────────────────────────
+function PinDropInner({onPin}) {
+  useMapEvents({ click(e){ onPin(e.latlng.lat, e.latlng.lng) } })
+  return null
+}
+
+function PinDropMap({lat, lng, onPin, center}) {
+  const markerIcon = L.divIcon({
+    html:`<div style="width:14px;height:14px;background:#e85040;border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(232,80,64,.8)"></div>`,
+    className:'',iconSize:[14,14],iconAnchor:[7,7]
+  })
+  return (
+    <div style={{height:220,borderRadius:2,overflow:'hidden',border:'1px solid #1e2c3a',marginBottom:12}}>
+      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#4a6070',padding:'4px 8px',background:'#0c1018',letterSpacing:1}}>
+        CLICK MAP TO DROP PIN · {lat&&lng ? `${parseFloat(lat).toFixed(4)}°N, ${parseFloat(lng).toFixed(4)}°E` : 'No pin set'}
+      </div>
+      <MapContainer center={center||[32,44]} zoom={5} style={{width:'100%',height:'calc(100% - 20px)'}} zoomControl={false} attributionControl={false}>
+        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" />
+        <PinDropInner onPin={onPin} />
+        {lat&&lng&&(
+          <Marker position={[parseFloat(lat),parseFloat(lng)]} icon={markerIcon} />
+        )}
+      </MapContainer>
+    </div>
+  )
+}
+
+// ── Country center lookup for pin map ───────────────
+const COUNTRY_CENTERS = {
+  IR:[33,53],JO:[31.2,36.5],IL:[31.5,35],KW:[29.3,47.5],SA:[24,45],QA:[25.3,51.2],
+  AE:[24.5,54.5],DE:[51,10],GB:[53,-1.5],GR:[39,22.5],IT:[42.5,12.5],FR:[46,2.5],
+  YE:[15.5,48],SY:[35,38],IQ:[33,44],LB:[33.8,35.8],
 }
 
 export function CountryEditor() {
@@ -304,13 +341,25 @@ export function CountryEditor() {
             </button>
             <div style={{...R,fontSize:18,fontWeight:700,color:C.tb}}>{site._new?'New Strike Site':site.name}</div>
           </div>
+          {/* Pin Drop Map */}
+          <div style={{marginBottom:12}}>
+            <div style={{...Z,fontSize:8,color:C.t3,marginBottom:6,letterSpacing:2}}>PIN DROP — Click map to set coordinates</div>
+            <PinDropMap
+              lat={site.lat} lng={site.lng}
+              center={COUNTRY_CENTERS[site.country_code||'IR']||[32,44]}
+              onPin={(lat,lng)=>setEditingSite(s=>({...s,lat:lat.toFixed(5),lng:lng.toFixed(5)}))}
+            />
+          </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
             {/* Country */}
             <div>
-              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:5,letterSpacing:2}}>COUNTRY CODE</div>
-              <input value={site.country_code||''} onChange={e=>setEditingSite(s=>({...s,country_code:e.target.value.toUpperCase().slice(0,2)}))}
-                maxLength={2} placeholder="IR"
-                style={{width:'100%',padding:'8px 10px',background:C.bg2,border:`1px solid ${C.br}`,color:C.t1,...Z,fontSize:12,borderRadius:1,outline:'none',boxSizing:'border-box'}} />
+              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:5,letterSpacing:2}}>COUNTRY</div>
+              <select value={site.country_code||'IR'} onChange={e=>setEditingSite(s=>({...s,country_code:e.target.value}))}
+                style={{width:'100%',padding:'8px 10px',background:C.bg2,border:`1px solid ${C.br}`,color:C.t1,...Z,fontSize:11,borderRadius:1,outline:'none',boxSizing:'border-box'}}>
+                {countries.map(c=>(
+                  <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+                ))}
+              </select>
             </div>
             {/* Name */}
             <div>

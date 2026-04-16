@@ -73,12 +73,20 @@ function getCountryICAOs(code) {
 
 function getCountryCenter(code) {
   const m={
-    IR:[32.5,53.7],JO:[31.2,36.5],IL:[31.5,35.0],KW:[29.3,47.5],
-    SA:[24.0,45.0],AE:[24.5,54.5],DE:[51.0,10.0],GB:[52.5,0.0],
-    GR:[38.0,23.0],QA:[25.3,51.2],IT:[42.0,12.5],FR:[46.0,2.0],
+    IR:[33.0,53.7],JO:[31.5,36.5],IL:[31.5,35.0],KW:[29.3,47.5],
+    SA:[24.0,45.0],AE:[24.5,54.5],DE:[51.0,10.5],GB:[53.5,-1.5],
+    GR:[39.0,22.5],QA:[25.3,51.2],IT:[42.5,12.5],FR:[46.5,2.5],
     YE:[15.5,48.0],SY:[35.0,38.0],
   }
   return m[code]||[30,40]
+}
+
+function getCountryZoom(code) {
+  const m={
+    IR:5, JO:7, IL:8, KW:8, SA:5, QA:9, AE:7,
+    DE:6, GB:6, GR:7, IT:6, FR:6, YE:6, SY:7,
+  }
+  return m[code]||5
 }
 
 export function CountryView({auth}) {
@@ -190,7 +198,7 @@ export function CountryView({auth}) {
       </div>
 
       <div style={{flex:1,overflow:'hidden',display:'flex'}}>
-        {tab==='OVERVIEW'&&<OverviewTab intel={intel} sites={sites} assets={assets} flights={flights} auth={auth} navigate={navigate} hasStrikeSites={hasStrikeSites} code={code} selSite={selSite} setSelSite={setSelSite} />}
+        {tab==='OVERVIEW'&&<OverviewTab intel={intel} sites={sites} assets={assets} flights={flights} auth={auth} navigate={navigate} hasStrikeSites={hasStrikeSites} code={code} selSite={selSite} setSelSite={setSelSite} onExpandSite={(s)=>{setSelSite(s);setTab('STRIKE SITES')}} />}
         {tab==='STRIKE SITES'&&<StrikeSitesTab sites={sites} auth={auth} selSite={selSite} setSelSite={setSelSite} code={code} siteListRef={siteListRef} />}
         {tab==='ASSETS'&&<AssetsTab assets={assets} auth={auth} navigate={navigate} />}
         {tab==='FLIGHTS'&&<FlightsTab flights={flights} auth={auth} />}
@@ -200,7 +208,7 @@ export function CountryView({auth}) {
   )
 }
 
-function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,code,selSite,setSelSite}) {
+function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,code,selSite,setSelSite,onExpandSite}) {
   const airbases = assets.filter(a=>a.asset_type==='airbase')
   const naval = assets.filter(a=>['carrier','destroyer','submarine'].includes(a.asset_type))
   return (
@@ -259,7 +267,7 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
         </div>
         <TierGate required="analyst" current={auth?.tier||'free'}>
           <div style={{flex:1,minHeight:300}}>
-            <CountryMap sites={hasStrikeSites?sites:[]} assets={assets} code={code} selSite={selSite} setSelSite={setSelSite} />
+            <CountryMap sites={hasStrikeSites?sites:[]} assets={assets} code={code} selSite={selSite} setSelSite={setSelSite} onExpand={onExpandSite} />
           </div>
         </TierGate>
         {hasStrikeSites&&sites.slice(0,5).length>0&&(
@@ -284,10 +292,11 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
   )
 }
 
-function CountryMap({sites,assets,code,selSite,setSelSite}) {
+function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
   const center = getCountryCenter(code)
+  const zoom = getCountryZoom(code)
   return (
-    <MapContainer center={center} zoom={5} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
+    <MapContainer key={code} center={center} zoom={zoom} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
       <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
       {sites.filter(s=>s.lat&&s.lng).map(s=>{
         const isSel = selSite?.id===s.id
@@ -302,7 +311,7 @@ function CountryMap({sites,assets,code,selSite,setSelSite}) {
                 <div style={{color:col,marginBottom:3,fontSize:9,letterSpacing:1}}>{s.status} · {s.site_type?.toUpperCase()}</div>
                 {s.geo_confirmed&&<div style={{...Z,fontSize:8,color:C.g,marginBottom:3}}>✓ GEO CONFIRMED</div>}
                 <div style={{color:C.t2,fontSize:9,lineHeight:1.5}}>{s.description?.slice(0,100)}...</div>
-                <div onClick={()=>setSelSite(s)} style={{...R,fontSize:10,fontWeight:600,color:C.a,marginTop:6,cursor:'pointer',letterSpacing:1}}>▼ EXPAND DETAIL</div>
+                <div onClick={()=>{ setSelSite(s); onExpand?.(s) }} style={{...R,fontSize:10,fontWeight:600,color:C.a,marginTop:6,cursor:'pointer',letterSpacing:1}}>▼ EXPAND DETAIL →</div>
               </div>
             </Popup>
           </Marker>
