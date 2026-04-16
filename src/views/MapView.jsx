@@ -539,24 +539,11 @@ export function MapView({ auth }) {
       <div style={{background:C.bg2,borderLeft:`1px solid ${C.br}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <PH title="Asset Detail" badge={selAsset?.name?.slice(0,18)||selCor?.callsign?.slice(0,14)||null} bc={C.t2} bb="transparent" />
         <div style={{flex:1,overflowY:'auto'}}>
-          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} />
+          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} auth={auth} />
           : selCor   ? <CorDetail cor={selCor} />
           : <EmptyDetail />}
         </div>
-        <div style={{height:165,borderTop:`1px solid ${C.br}`,background:C.bg,flexShrink:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          <div style={{padding:'5px 12px',background:C.bg4,borderBottom:`1px solid ${C.br}`,display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
-            <span style={{...R,fontSize:10,fontWeight:600,letterSpacing:3,color:C.t2}}>SIGACT FEED</span>
-            <span style={{...Z,fontSize:9,color:C.g}}>● LIVE</span>
-          </div>
-          <div style={{overflowY:'auto',flex:1}}>
-            {(liveFeeds.length>0 ? liveFeeds.map(f=>({t:'LIVE',h:f.content_html,id:f.id})) : FEED_ITEMS).map((f,i)=>(
-              <div key={f.id||i} style={{display:'flex',gap:8,padding:'5px 12px',borderBottom:`1px solid rgba(30,44,58,.4)`,fontSize:11}}>
-                <span style={{...Z,fontSize:9,color:C.t3,width:36,flexShrink:0,paddingTop:1}}>{f.t}</span>
-                <span style={{color:C.t2,flex:1,lineHeight:1.5}} dangerouslySetInnerHTML={{__html:f.h}} />
-              </div>
-            ))}
-          </div>
-        </div>
+        <SigactPanel feeds={liveFeeds} selAsset={selAsset} />
       </div>
 
       <div style={{gridColumn:'1/4',height:24,background:C.bg4,borderTop:`1px solid ${C.br}`,display:'flex',alignItems:'center',padding:'0 14px',gap:16,flexShrink:0}}>
@@ -631,7 +618,7 @@ function AListItem({asset,sel,onClick}) {
   )
 }
 
-function ADetail({asset,onExpand,flights,navigate}) {
+function ADetail({asset,onExpand,flights,navigate,auth}) {
   const stCol={DEPLOYED:C.g,ACTIVE:C.g,SURGE:C.r,ELEVATED:C.a,ONGOING:C.r,REFIT:C.t3}[asset.status]||C.t2
   const [selAc, setSelAc] = useState(null)
 
@@ -716,6 +703,9 @@ function ADetail({asset,onExpand,flights,navigate}) {
         )}
       </div>
       {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
+      {['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
+        <PositionUpdate asset={asset} auth={auth} />
+      )}
       {asset.type==='lmsr'&&asset.loc&&<DBlk label="POSITION" value={`${asset.loc}\nLast report: ${asset.lastRpt}`} />}
 
       {/* Carriers use AIR WING section below - skip generic aircraft list */}
@@ -750,26 +740,11 @@ function ADetail({asset,onExpand,flights,navigate}) {
         </div>
       )}
 
-      {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
-      {asset.type==='carrier'&&asset.sub&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:6}}>EXTERNAL SOURCES</div>
-          {[
-            {id:'cvn78',hull:'CVN-78',path:'cvn78'},
-            {id:'cvn77',hull:'CVN-77',path:'cvn77'},
-            {id:'cvn72',hull:'CVN-72',path:'cvn72'},
-            {id:'r08',hull:'R08',path:null},
-            {id:'r91',hull:'R91',path:null},
-          ].filter(c=>asset.id===c.id&&c.path).map(c=>(
-            <a key={c.hull} href={`https://www.uscarriers.net/${c.path}history.htm`} target="_blank" rel="noopener noreferrer"
-              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none',marginBottom:4}}>
-              <span style={{...Z,fontSize:9,color:C.b}}>↗</span>
-              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>USCarriers.net — {asset.name} History</span>
-              <span style={{...Z,fontSize:8,color:C.t3,marginLeft:'auto'}}>DEPLOYMENT LOG</span>
-            </a>
-          ))}
-        </div>
+      {asset.escorts?.length>0&&(
+        <EscortList escorts={asset.escorts} />
       )}
+            {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
+
       {asset.type==='airbase'&&(
         <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`,display:'flex',flexDirection:'column',gap:4}}>
           <button onClick={()=>navigate(`/airbase/${asset.id.toUpperCase()}`)}
@@ -783,27 +758,35 @@ function ADetail({asset,onExpand,flights,navigate}) {
         </div>
       )}
       {asset.squadrons?.length>0&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>AIR WING</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
-            {asset.squadrons.map((sq,i)=>(
-              <div key={i} style={{...Z,fontSize:9,color:C.t1,padding:'3px 6px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>{sq}</div>
-            ))}
+        <div style={{padding:'10px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:10}}>AIR WING — {asset.csg}</div>
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {asset.squadrons.map((sq,i)=>{
+              const parts = sq.match(/^([A-Z]+-\d+[A-Z.0-9 ]*?)\s*(?:\(([^)]+)\))?$/)
+              const sqNum = parts?.[1] || sq
+              const acType = parts?.[2] || ''
+              return (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
+                  <span style={{...R,fontSize:13,fontWeight:700,color:C.tb,minWidth:80}}>{sqNum}</span>
+                  <span style={{...Z,fontSize:10,color:C.b}}>{acType}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
-      {asset.escorts?.length>0&&(
+      {asset.type==='carrier'&&asset.sub&&(
         <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>BATTLE GROUP</div>
-          {asset.escorts.map((e,i)=>(
-            <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',borderBottom:`1px solid rgba(30,44,58,.3)`}}>
-              <span style={{fontSize:11}}>⚓</span>
-              <div style={{flex:1}}>
-                <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{e.name}</div>
-                <div style={{...Z,fontSize:8,color:C.t2}}>{e.sub}</div>
-              </div>
-              <span style={{...R,fontSize:9,color:C.t3}}>{e.role}</span>
-            </div>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:6}}>EXTERNAL SOURCES</div>
+          {[
+            {id:'cvn78',path:'cvn78'},{id:'cvn77',path:'cvn77'},{id:'cvn72',path:'cvn72'},
+          ].filter(c=>asset.id===c.id&&c.path).map(c=>(
+            <a key={c.id} href={`https://www.uscarriers.net/${c.path}history.htm`} target="_blank" rel="noopener noreferrer"
+              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none'}}>
+              <span style={{...Z,fontSize:9,color:C.b}}>↗</span>
+              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>USCarriers.net — {asset.name} History</span>
+              <span style={{...Z,fontSize:8,color:C.t3,marginLeft:'auto'}}>DEPLOYMENT LOG</span>
+            </a>
           ))}
         </div>
       )}
@@ -911,26 +894,11 @@ function AbmModal({asset,flights,onClose,navigate}) {
               <SBox value={socomIn} label="SOCOM" color={C.p} />
             </div>
             {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
-      {asset.type==='carrier'&&asset.sub&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:6}}>EXTERNAL SOURCES</div>
-          {[
-            {id:'cvn78',hull:'CVN-78',path:'cvn78'},
-            {id:'cvn77',hull:'CVN-77',path:'cvn77'},
-            {id:'cvn72',hull:'CVN-72',path:'cvn72'},
-            {id:'r08',hull:'R08',path:null},
-            {id:'r91',hull:'R91',path:null},
-          ].filter(c=>asset.id===c.id&&c.path).map(c=>(
-            <a key={c.hull} href={`https://www.uscarriers.net/${c.path}history.htm`} target="_blank" rel="noopener noreferrer"
-              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none',marginBottom:4}}>
-              <span style={{...Z,fontSize:9,color:C.b}}>↗</span>
-              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>USCarriers.net — {asset.name} History</span>
-              <span style={{...Z,fontSize:8,color:C.t3,marginLeft:'auto'}}>DEPLOYMENT LOG</span>
-            </a>
-          ))}
-        </div>
-      )}
+
             {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
+      {['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
+        <PositionUpdate asset={asset} auth={auth} />
+      )}
           </div>
         )}
         {(tab==='ARRIVALS (INBOUND)'||tab==='DEPARTURES (OUTBOUND)')&&(
@@ -1038,6 +1006,168 @@ function AircraftTypeRow({ ac, color }) {
     </div>
   )
 }
+
+// ── EscortList: clickable escorts with inline detail ─
+function EscortList({escorts}) {
+  const [selEscort, setSelEscort] = useState(null)
+  return (
+    <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
+      <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>BATTLE GROUP</div>
+      {escorts.map((e,i)=>{
+        const isSel = selEscort===i
+        return (
+          <div key={i}>
+            <div onClick={()=>setSelEscort(isSel?null:i)}
+              style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',marginBottom:2,
+                background:isSel?'rgba(80,160,232,.08)':C.bg3,
+                border:`1px solid ${isSel?C.b:C.br}`,borderRadius:1,cursor:'pointer'}}>
+              <span style={{fontSize:11}}>⚓</span>
+              <div style={{flex:1}}>
+                <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{e.name}</div>
+                <div style={{...Z,fontSize:9,color:C.t2}}>{e.sub}</div>
+              </div>
+              <span style={{...R,fontSize:9,color:C.t3}}>{e.role}</span>
+              <span style={{...Z,fontSize:9,color:isSel?C.b:C.t3}}>{isSel?'▲':'▼'}</span>
+            </div>
+            {isSel&&(
+              <div style={{padding:'10px 12px',background:'rgba(80,160,232,.04)',border:`1px solid ${C.b}44`,borderTop:'none',borderRadius:'0 0 1px 1px',marginBottom:4}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                  <div style={{padding:8,background:C.bg,border:`1px solid ${C.br}`,borderRadius:1}}>
+                    <div style={{...Z,fontSize:9,color:C.t3,marginBottom:2}}>HULL</div>
+                    <div style={{...R,fontSize:14,fontWeight:700,color:C.b}}>{e.sub}</div>
+                  </div>
+                  <div style={{padding:8,background:C.bg,border:`1px solid ${C.br}`,borderRadius:1}}>
+                    <div style={{...Z,fontSize:9,color:C.t3,marginBottom:2}}>CLASS</div>
+                    <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{e.role==='Combat Logistics'?'Supply':'Arleigh Burke'}</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  <a href={`https://www.navsource.org/archives/05/${(e.sub||'').replace('DDG-','')}.htm`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{...Z,fontSize:9,color:C.b,padding:'3px 8px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>
+                    ↗ NavSource
+                  </a>
+                  <a href={`https://en.wikipedia.org/wiki/${encodeURIComponent(e.name)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{...Z,fontSize:9,color:C.t2,padding:'3px 8px',border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none'}}>
+                    ↗ Wikipedia
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── PositionUpdate: admin-only ship position editor ──
+function PositionUpdate({asset,auth}) {
+  const [open, setOpen] = useState(false)
+  const [lat, setLat] = useState(asset.lat||'')
+  const [lng, setLng] = useState(asset.lng||'')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState(null)
+  if(!auth?.isAdmin) return null
+  async function save() {
+    setSaving(true)
+    const {data:existing} = await supabase.from('assets').select('id').eq('name',asset.name).maybeSingle()
+    let err
+    if(existing) {
+      ({error:err} = await supabase.from('assets').update({lat:parseFloat(lat),lng:parseFloat(lng)}).eq('id',existing.id))
+    } else {
+      ({error:err} = await supabase.from('assets').insert({name:asset.name,asset_type:asset.type,hull_number:asset.hull||asset.sub,lat:parseFloat(lat),lng:parseFloat(lng),status:asset.status,country:asset.country}))
+    }
+    setSaving(false)
+    if(err){setMsg('Error: '+err.message);return}
+    setMsg('Position saved — reload to see update')
+    setTimeout(()=>setMsg(null),4000)
+    setOpen(false)
+  }
+  const inp = {width:'100%',padding:'7px 10px',background:C.bg,border:`1px solid ${C.br}`,color:C.y,fontFamily:"'Share Tech Mono',monospace",fontSize:11,outline:'none',boxSizing:'border-box',borderRadius:1}
+  return (
+    <div style={{padding:'6px 13px',borderBottom:`1px solid ${C.br}`}}>
+      {!open ? (
+        <button onClick={()=>setOpen(true)}
+          style={{...R,fontSize:10,fontWeight:600,letterSpacing:2,padding:'5px 12px',background:'transparent',border:`1px solid ${C.t3}`,color:C.t2,cursor:'pointer',width:'100%'}}>
+          📍 UPDATE POSITION
+        </button>
+      ) : (
+        <div>
+          <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:6}}>NEW POSITION (decimal degrees)</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+            <div>
+              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:3}}>LATITUDE</div>
+              <input type="number" step="0.01" value={lat} onChange={e=>setLat(e.target.value)} style={inp} placeholder="16.00" />
+            </div>
+            <div>
+              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:3}}>LONGITUDE</div>
+              <input type="number" step="0.01" value={lng} onChange={e=>setLng(e.target.value)} style={inp} placeholder="54.00" />
+            </div>
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <button onClick={save} disabled={saving}
+              style={{...R,fontSize:11,fontWeight:700,padding:'5px 16px',background:saving?C.br:C.g,color:C.bg,border:'none',cursor:'pointer',flex:1,borderRadius:1}}>
+              {saving?'SAVING...':'SAVE'}
+            </button>
+            <button onClick={()=>setOpen(false)}
+              style={{...R,fontSize:11,padding:'5px 12px',background:'transparent',border:`1px solid ${C.br}`,color:C.t2,cursor:'pointer',borderRadius:1}}>
+              CANCEL
+            </button>
+          </div>
+          {msg&&<div style={{...Z,fontSize:9,color:C.g,marginTop:6}}>{msg}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── SigactPanel: collapsible feed with asset-aware filtering ──
+function SigactPanel({feeds, selAsset}) {
+  const [open, setOpen] = useState(true)
+  // Filter feed by selected asset name when one is selected
+  const items = feeds.length>0
+    ? feeds.map(f=>({t:'LIVE',h:f.content_html,id:f.id}))
+    : FEED_ITEMS
+  const filtered = selAsset
+    ? items.filter(f => {
+        const txt = (f.h||'').toLowerCase()
+        const name = (selAsset.name||'').toLowerCase()
+        const sub = (selAsset.sub||'').toLowerCase()
+        return txt.includes(name.split(' ').pop()) || txt.includes(sub.split('//')[0].trim().toLowerCase())
+      })
+    : items
+  const showItems = filtered.length > 0 ? filtered : items.slice(0,3)
+  return (
+    <div style={{borderTop:`1px solid ${C.br}`,background:C.bg,flexShrink:0,display:'flex',flexDirection:'column',maxHeight:open?200:32,transition:'max-height .25s ease',overflow:'hidden'}}>
+      <div onClick={()=>setOpen(v=>!v)}
+        style={{padding:'5px 12px',background:C.bg4,borderBottom:open?`1px solid ${C.br}`:'none',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0,cursor:'pointer',userSelect:'none'}}>
+        <span style={{...R,fontSize:10,fontWeight:600,letterSpacing:3,color:C.t2}}>
+          SIGACT FEED {selAsset?<span style={{color:C.a,fontSize:8,letterSpacing:1}}>· {selAsset.name.split(' ').slice(-1)[0].toUpperCase()}</span>:null}
+        </span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{...Z,fontSize:9,color:C.g}}>● LIVE</span>
+          <span style={{...Z,fontSize:9,color:C.t3}}>{open?'▼':'▲'}</span>
+        </div>
+      </div>
+      {open&&(
+        <div style={{overflowY:'auto',flex:1}}>
+          {showItems.map((f,i)=>(
+            <div key={f.id||i} style={{display:'flex',gap:8,padding:'5px 12px',borderBottom:`1px solid rgba(30,44,58,.4)`,fontSize:11}}>
+              <span style={{...Z,fontSize:9,color:C.t3,width:36,flexShrink:0,paddingTop:1}}>{f.t}</span>
+              <span style={{color:C.t2,flex:1,lineHeight:1.5}} dangerouslySetInnerHTML={{__html:f.h}} />
+            </div>
+          ))}
+          {selAsset&&filtered.length===0&&(
+            <div style={{...Z,fontSize:9,color:C.t3,padding:'10px 12px'}}>No feed items matched to {selAsset.name}</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 function normCallsign(cs) {
   if (!cs) return '—'
