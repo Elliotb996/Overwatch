@@ -13,8 +13,14 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   realtime: { params: { eventsPerSecond: 10 } }
 })
 
-// ─── Tier helpers ──────────────────────────────────────────────
-const TIER_ORDER = { free: 0, analyst: 1, premium: 2, admin: 3 }
+// ─── Tier hierarchy ────────────────────────────────────────────
+// owner > admin > premium > analyst > free
+// owner: platform founder - can manage admins, full system control
+// admin: trusted contributors - can edit content, manage analyst/premium
+// premium: paid full access
+// analyst: standard paid access
+// free: limited public view
+const TIER_ORDER = { free: 0, analyst: 1, premium: 2, admin: 3, owner: 4 }
 
 export function getTierFromJwt(session) {
   try {
@@ -41,7 +47,6 @@ export async function uploadImagery(file, assetId) {
   return { path, publicUrl: data.publicUrl }
 }
 
-export function getImageryUrl(storagePath, tier) {
-  // Premium+ gets full res; analyst gets thumbnail (if implemented server-side)
+export function getImageryUrl(storagePath) {
   return supabase.storage.from('imagery').getPublicUrl(storagePath).data.publicUrl
 }

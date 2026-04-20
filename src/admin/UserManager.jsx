@@ -9,16 +9,17 @@ const C = {
   bg:'#07090b', bg2:'#0c1018', bg3:'#101620', bg4:'#161e28', br:'#1e2c3a',
 }
 
-const TIERS = ['free','analyst','premium','admin']
-const TIER_COL = { free:C.t2, analyst:C.b, premium:C.p, admin:C.a }
+const TIERS = ['free','analyst','premium','admin','owner']
+const TIER_COL = { free:C.t2, analyst:C.b, premium:C.p, admin:C.a, owner:C.g }
 const TIER_DESC = {
   free:    'Public access — map view only, no intel data',
   analyst: 'Standard access — intel summaries, flights, imagery gallery',
   premium: 'Full access — coordinates, satellite imagery, all layers',
-  admin:   'Full admin — edit, upload, manage users',
+  admin:   'Content admin — edit, upload, manage analyst/premium accounts',
+  owner:   'Platform owner — full system control, manage all tiers',
 }
 
-export function UserManager() {
+export function UserManager({ auth }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
@@ -47,14 +48,16 @@ export function UserManager() {
 
   async function setTier(userId, newTier) {
     setSaving(userId)
-    // Call the security definer function which updates both tables + auth metadata
-    const { error } = await supabase.rpc('admin_set_user_tier', {
-      user_id: userId,
-      new_tier: newTier
-    })
+    // Update user_profiles table — useAuth reads tier from here, not cached JWT
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ tier: newTier })
+      .eq('id', userId)
     setSaving(null)
     if (error) { flash('Failed: ' + error.message, true); return }
-    flash(`Tier updated to ${newTier.toUpperCase()}`)
+    // Also sync auth metadata (best effort - won't affect active session until re-login)
+    await supabase.rpc('admin_set_user_tier', { user_id: userId, new_tier: newTier }).catch(()=>{})
+    flash(`Tier updated → ${newTier.toUpperCase()}`)
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, tier: newTier } : u))
   }
 
@@ -153,6 +156,8 @@ export function UserManager() {
             user={user}
             saving={saving === user.id}
             editingNotes={editNotes === user.id}
+            isOwner={auth?.isOwner}
+            currentUserId={auth?.session?.user?.id}
             onSetTier={newTier => setTier(user.id, newTier)}
             onEditNotes={() => setEditNotes(user.id)}
             onSaveNotes={notes => saveNotes(user.id, notes)}
@@ -165,7 +170,7 @@ export function UserManager() {
   )
 }
 
-function UserRow({ user, saving, editingNotes, onSetTier, onEditNotes, onSaveNotes, onCancelNotes, onDelete }) {
+function UserRow({ user, saving, editingNotes, isOwner, currentUserId, onSetTier, onEditNotes, onSaveNotes, onCancelNotes, onDelete }) {
   const [notesVal, setNotesVal] = useState(user.notes || '')
   const tierCol = TIER_COL[user.tier] || C.t2
   const isAdmin = user.tier === 'admin'
@@ -219,27 +224,36 @@ function UserRow({ user, saving, editingNotes, onSetTier, onEditNotes, onSaveNot
 
         {/* Tier selector */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 3 }}>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {saving ? (
               <span style={{ ...Z, fontSize: 9, color: C.t3, padding: '4px 10px' }}>SAVING...</span>
-            ) : TIERS.map(t => (
-              <button key={t} onClick={() => t !== user.tier && onSetTier(t)}
-                disabled={t === user.tier}
-                style={{ ...R, fontSize: 10, fontWeight: 700, padding: '4px 10px', cursor: t === user.tier ? 'default' : 'pointer',
-                  background: t === user.tier ? `${TIER_COL[t]}22` : 'transparent',
-                  border: `1px solid ${t === user.tier ? TIER_COL[t] : C.br}`,
-                  color: t === user.tier ? TIER_COL[t] : C.t3,
-                  borderRadius: 1, letterSpacing: 0.5 }}>
-                {t.toUpperCase()}
-              </button>
-            ))}
+            ) : TIERS.map(t => {
+              // Only owners can set admin/owner tier — admins can only set free/analyst/premium
+              const restricted = (t === 'admin' || t === 'owner') && !isOwner
+              // Can't edit yourself or restricted tiers
+              const disabled = t === user.tier || restricted || user.id === currentUserId
+              if (restricted && t !== user.tier) return null // hide restricted options
+              return (
+                <button key={t} onClick={() => !disabled && onSetTier(t)}
+                  disabled={disabled}
+                  title={restricted ? 'Owner-only' : t === user.tier ? 'Current tier' : `Set to ${t}`}
+                  style={{ ...R, fontSize: 10, fontWeight: 700, padding: '4px 10px',
+                    cursor: disabled ? 'default' : 'pointer', opacity: disabled && t !== user.tier ? 0.4 : 1,
+                    background: t === user.tier ? `${TIER_COL[t]}22` : 'transparent',
+                    border: `1px solid ${t === user.tier ? TIER_COL[t] : C.br}`,
+                    color: t === user.tier ? TIER_COL[t] : C.t3,
+                    borderRadius: 1, letterSpacing: 0.5 }}>
+                  {t.toUpperCase()}
+                </button>
+              )
+            })}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={onEditNotes}
               style={{ ...Z, fontSize: 8, padding: '2px 8px', background: 'transparent', border: `1px solid ${C.br}`, color: C.t3, cursor: 'pointer', borderRadius: 1 }}>
               📝 NOTES
             </button>
-            {!isAdmin && (
+            {user.tier !== 'owner' && user.id !== currentUserId && (
               <button onClick={onDelete}
                 style={{ ...Z, fontSize: 8, padding: '2px 8px', background: 'transparent', border: `1px solid rgba(232,80,64,.3)`, color: C.r, cursor: 'pointer', borderRadius: 1 }}>
                 REMOVE

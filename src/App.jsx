@@ -54,7 +54,7 @@ export default function App() {
               <Route path="assets"       element={<AssetEditor />} />
               <Route path="coronets"     element={<CoronetEditor />} />
               <Route path="countries"    element={<CountryEditor />} />
-              <Route path="users"        element={<UserManager />} />
+              <Route path="users"        element={<UserManager auth={auth} />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
