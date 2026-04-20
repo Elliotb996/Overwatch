@@ -3,60 +3,82 @@ import { useEffect, useState } from 'react'
 import { supabase, getTierFromJwt, canSee } from '../lib/supabase'
 
 export function useAuth() {
-  const [session, setSession]   = useState(null)
-  const [tier, setTier]         = useState('free')
-  const [loading, setLoading]   = useState(true)
+  const [session, setSession] = useState(null)
+  const [tier, setTier]       = useState('free')
+  const [loading, setLoading] = useState(true)
 
-  // ── Read tier from user_profiles table (always live, not cached JWT) ──
+  // Read tier from user_profiles (live) with JWT as fallback
+  // ALWAYS resolves - never hangs
   async function fetchTier(session) {
     if (!session?.user) return 'free'
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('tier')
         .eq('id', session.user.id)
         .maybeSingle()
-      // Profile table is authoritative; JWT is fallback for first login
-      return data?.tier || getTierFromJwt(session) || 'free'
+      if (error || !data) return getTierFromJwt(session) || 'free'
+      return data.tier || 'free'
     } catch {
       return getTierFromJwt(session) || 'free'
     }
   }
 
-  async function syncProfile(session) {
+  // Upsert profile — fire and forget, never blocks loading
+  function syncProfile(session) {
     if (!session?.user) return
-    const jwtTier = getTierFromJwt(session)
-    await supabase.from('user_profiles').upsert({
+    supabase.from('user_profiles').upsert({
       id: session.user.id,
       email: session.user.email,
-      // Only set tier from JWT if profile doesn't exist yet
-      // (upsert with ignoreDuplicates=false, so existing tier is preserved via DB function)
       last_sign_in: new Date().toISOString(),
-    }, { onConflict: 'id', ignoreDuplicates: false })
-  }
-
-  async function initSession(s) {
-    setSession(s)
-    if (s) {
-      const t = await fetchTier(s)
-      setTier(t)
-      syncProfile(s)
-    } else {
-      setTier('free')
-    }
+    }, { onConflict: 'id' }).catch(() => {})
   }
 
   useEffect(() => {
+    let mounted = true
+
+    // Initialise from existing session
     supabase.auth.getSession().then(async ({ data }) => {
-      await initSession(data.session)
-      setLoading(false)
+      if (!mounted) return
+      const s = data.session
+      setSession(s)
+      if (s) {
+        // Fetch tier but ALWAYS call setLoading(false)
+        fetchTier(s).then(t => {
+          if (mounted) setTier(t)
+        }).catch(() => {
+          if (mounted) setTier(getTierFromJwt(s) || 'free')
+        }).finally(() => {
+          if (mounted) setLoading(false)
+          syncProfile(s)
+        })
+      } else {
+        setLoading(false)
+      }
+    }).catch(() => {
+      if (mounted) setLoading(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_e, s) => {
-      await initSession(s)
+    // Auth state changes (login/logout)
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => {
+      if (!mounted) return
+      setSession(s)
+      if (s) {
+        fetchTier(s).then(t => {
+          if (mounted) setTier(t)
+        }).catch(() => {
+          if (mounted) setTier(getTierFromJwt(s) || 'free')
+        })
+        syncProfile(s)
+      } else {
+        setTier('free')
+      }
     })
 
-    return () => listener.subscription.unsubscribe()
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   return {

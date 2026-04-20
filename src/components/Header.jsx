@@ -3,6 +3,14 @@ import { Link, useLocation } from 'react-router-dom'
 
 const Z = { fontFamily: "'Share Tech Mono', monospace" }
 
+const TIER_META = {
+  owner:   { color: '#39e0a0', label: '◈ OWNER',  link: '/admin' },
+  admin:   { color: '#f0a040', label: '● ADMIN',   link: '/admin' },
+  premium: { color: '#a060e8', label: 'PREMIUM',   link: null },
+  analyst: { color: '#50a0e8', label: 'ANALYST',   link: null },
+  free:    { color: '#4a6070', label: 'FREE',      link: null },
+}
+
 function UTC() {
   const [t, setT] = useState('')
   useEffect(() => {
@@ -25,6 +33,8 @@ export function Header({ auth }) {
     { to: '/conus',   label: 'CONUS BASES' },
     { to: '/sealift', label: 'SEALIFT' },
   ]
+
+  const meta = TIER_META[auth.tier] || TIER_META.free
 
   return (
     <header style={{
@@ -68,20 +78,29 @@ export function Header({ auth }) {
       <div style={{ marginLeft: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
         {auth.session ? (
           <>
-            {/* Show tier badge only for non-admin tiers */}
-            {!auth.isAdmin && <TierBadge tier={auth.tier} />}
-
-            {/* Admin gets a single combined badge that links to admin panel */}
-            {auth.isAdmin ? (
-              <Link to="/admin" style={{
-                ...Z, fontSize: 10, letterSpacing: 2, color: '#f0a040',
-                textDecoration: 'none', padding: '3px 10px',
-                border: '1px solid rgba(240,160,64,.4)',
-                background: 'rgba(240,160,64,.08)',
+            {/* Single unified tier badge — links to admin panel for admin/owner */}
+            {meta.link ? (
+              <Link to={meta.link} style={{
+                ...Z, fontSize: 10, letterSpacing: 2,
+                color: meta.color,
+                textDecoration: 'none',
+                padding: '3px 10px',
+                border: `1px solid ${meta.color}44`,
+                background: `${meta.color}0d`,
               }}>
-                ● ADMIN
+                {meta.label}
               </Link>
-            ) : null}
+            ) : (
+              <span style={{
+                ...Z, fontSize: 9, letterSpacing: 2,
+                color: meta.color,
+                padding: '2px 8px',
+                border: `1px solid ${meta.color}40`,
+                background: `${meta.color}12`,
+              }}>
+                {meta.label}
+              </span>
+            )}
 
             <button onClick={auth.signOut}
               style={{ ...Z, fontSize: 10, letterSpacing: 1, color: '#4a6070', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>
@@ -93,21 +112,6 @@ export function Header({ auth }) {
         )}
       </div>
     </header>
-  )
-}
-
-function TierBadge({ tier }) {
-  const colors = { free: '#4a6070', analyst: '#50a0e8', premium: '#a060e8', admin: '#f0a040' }
-  return (
-    <span style={{
-      fontFamily: "'Share Tech Mono', monospace",
-      fontSize: 9,
-      letterSpacing: 2,
-      padding: '2px 8px',
-      border: `1px solid ${colors[tier] || '#4a6070'}40`,
-      background: `${colors[tier] || '#4a6070'}12`,
-      color: colors[tier] || '#4a6070',
-    }}>{(tier || 'free').toUpperCase()}</span>
   )
 }
 
@@ -125,7 +129,11 @@ function LoginModal({ signIn }) {
     else setOpen(false)
   }
 
-  const inp = { background: '#07090b', border: '1px solid #1e2c3a', color: '#b8ccd8', padding: '7px 10px', fontFamily: "'Share Tech Mono', monospace", fontSize: 11, outline: 'none', width: '100%' }
+  const inp = {
+    background: '#07090b', border: '1px solid #1e2c3a', color: '#b8ccd8',
+    padding: '7px 10px', fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 11, outline: 'none', width: '100%',
+  }
 
   return (
     <>
