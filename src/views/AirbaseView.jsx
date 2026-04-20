@@ -755,8 +755,9 @@ function ImageryTab({images:initImages,code,auth}) {
 
               {/* Detail panel */}
               {selImg&&(
-                <div style={{flex:1,overflow:'auto'}}>
-                <DetailPanel img={selImg} auth={auth} onDelete={deleteImg} onSaved={reload} />
+                <div style={{flex:1,overflow:'auto',display:'flex',flexDirection:'column'}}>
+                  <DetailPanel img={selImg} auth={auth} onDelete={deleteImg} onSaved={reload} />
+                </div>
               )}
             </>
           )}

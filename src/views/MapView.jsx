@@ -34,15 +34,16 @@ const C = {
   bg:'#07090b', bg2:'#0c1018', bg3:'#101620', bg4:'#161e28', br:'#1e2c3a', br2:'#273a4c',
 }
 
-// GeoJSON country layer escalation colours
+// GeoJSON country layer — Option C: no fill, border glow on hover only
+// Countries invisible by default; escalation-coloured border appears on hover
 const ESC_GEO = {
-  CRITICAL:{ fill:'#e85040', stroke:'#e85040', fo:0.18, so:0.75 },
-  SURGE:   { fill:'#e85040', stroke:'#e85040', fo:0.18, so:0.75 },
-  HIGH:    { fill:'#f0a040', stroke:'#f0a040', fo:0.14, so:0.65 },
-  ELEVATED:{ fill:'#e8d040', stroke:'#e8d040', fo:0.10, so:0.55 },
-  ACTIVE:  { fill:'#50a0e8', stroke:'#50a0e8', fo:0.10, so:0.45 },
-  MODERATE:{ fill:'#50a0e8', stroke:'#50a0e8', fo:0.08, so:0.35 },
-  WATCH:   { fill:'#28404c', stroke:'#4a6070', fo:0.05, so:0.20 },
+  CRITICAL:{ fill:'#e85040', stroke:'#e85040', fo:0,    so:0    },
+  SURGE:   { fill:'#e85040', stroke:'#e85040', fo:0,    so:0    },
+  HIGH:    { fill:'#f0a040', stroke:'#f0a040', fo:0,    so:0    },
+  ELEVATED:{ fill:'#e8d040', stroke:'#e8d040', fo:0,    so:0    },
+  ACTIVE:  { fill:'#50a0e8', stroke:'#50a0e8', fo:0,    so:0    },
+  MODERATE:{ fill:'#50a0e8', stroke:'#50a0e8', fo:0,    so:0    },
+  WATCH:   { fill:'#4a6070', stroke:'#4a6070', fo:0,    so:0    },
 }
 
 function mkIcon(emoji, color, size=26, pulse=false, badge=null) {
@@ -362,19 +363,23 @@ export function MapView({ auth }) {
   // GeoJSON layer style + interaction functions
   function geoStyle(feature) {
     const intel = countryIntel.find(c => c.code === feature.properties.code)
+    // Option C: all countries invisible by default - hover triggers the border
     if (!intel) return { fillOpacity:0, opacity:0, weight:0, interactive:false }
-    const e = ESC_GEO[intel.escalation] || ESC_GEO.WATCH
-    return { fillColor:e.fill, fillOpacity:e.fo, color:e.stroke, weight:1.5, opacity:e.so }
+    return { fillColor:'transparent', fillOpacity:0, color:'transparent', weight:0, opacity:0 }
   }
 
   function onEachFeature(feature, layer) {
     const intel = countryIntel.find(c => c.code === feature.properties.code)
     if (!intel) { layer.options.interactive = false; return }
     const e = ESC_GEO[intel.escalation] || ESC_GEO.WATCH
+    // Option C: invisible default, escalation border glows on hover
     layer.on({
-      mouseover: ev => { ev.target.setStyle({ fillOpacity: e.fo * 2.8, weight: 2.5, opacity: 1 }); ev.target.bringToFront() },
-      mouseout:  ev => ev.target.setStyle({ fillOpacity: e.fo, weight: 1.5, opacity: e.so }),
-      click:     ()  => navigate(`/country/${feature.properties.code}`)
+      mouseover: ev => {
+        ev.target.setStyle({ fillColor:e.fill, fillOpacity:0.08, color:e.stroke, weight:2, opacity:0.9 })
+        ev.target.bringToFront()
+      },
+      mouseout: ev => ev.target.setStyle({ fillOpacity:0, opacity:0, weight:0, color:'transparent' }),
+      click:    ()  => navigate(`/country/${feature.properties.code}`)
     })
     layer.bindTooltip(
       `<div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#dceaf0;background:rgba(7,9,11,.95);border:1px solid ${e.stroke};padding:5px 12px;border-radius:2px;letter-spacing:1px;pointer-events:none">
@@ -950,7 +955,7 @@ function AbmModal({asset,flights,onClose,navigate}) {
           </div>
         ))}
         <button onClick={()=>navigate(`/airbase/${asset.id.toUpperCase()}`)}
-          style={{padding:'0 16px',borderLeft:`1px solid ${C.br}`,background:'rgba(80,160,232,.08)',color:C.b,cursor:'pointer',...R,fontSize:11,fontWeight:600,letterSpacing:1,border:'none',borderLeft:`1px solid ${C.br}`}}>
+          style={{padding:'0 16px',borderLeft:`1px solid ${C.br}`,background:'rgba(80,160,232,.08)',color:C.b,cursor:'pointer',...R,fontSize:11,fontWeight:600,letterSpacing:1}}>
           → FULL PAGE
         </button>
         <div onClick={onClose} style={{width:48,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:C.t2,cursor:'pointer',borderLeft:`1px solid ${C.br}`}}>✕</div>
