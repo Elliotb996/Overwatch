@@ -13,6 +13,7 @@ import { UnitManager }    from './admin/UnitManager'
 import { AssetEditor }    from './admin/AssetEditor'
 import { CoronetEditor }  from './admin/CoronetEditor'
 import { CountryEditor }  from './admin/CountryEditor'
+import { UserManager }    from './admin/UserManager'
 
 export default function App() {
   const auth = useAuth()
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="assets"       element={<AssetEditor />} />
               <Route path="coronets"     element={<CoronetEditor />} />
               <Route path="countries"    element={<CountryEditor />} />
+              <Route path="users"        element={<UserManager />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

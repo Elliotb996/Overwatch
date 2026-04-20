@@ -17,6 +17,7 @@ export function AdminLayout({ auth }) {
             { to: '/admin/assets',    label: 'ASSETS' },
             { to: '/admin/coronets',  label: 'CORONETS' },
             { to: '/admin/countries', label: 'COUNTRIES' },
+            { to: '/admin/users',     label: 'ACCOUNTS' },
           ].map(({ to, label }) => (
             <NavLink key={to} to={to}
               style={({ isActive }) => ({
