@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
-import { AuthGate }       from './components/AuthGate'
 import { Header }         from './components/Header'
 import { MapView }        from './views/MapView'
 import { ConusView }      from './views/ConusView'
@@ -14,6 +13,7 @@ import { AssetEditor }    from './admin/AssetEditor'
 import { CoronetEditor }  from './admin/CoronetEditor'
 import { CountryEditor }  from './admin/CountryEditor'
 import { UserManager }    from './admin/UserManager'
+import { LoginPage }      from './components/LoginPage'
 
 export default function App() {
   const auth = useAuth()
@@ -23,9 +23,9 @@ export default function App() {
       <div style={{
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#07090b', fontFamily: "'Share Tech Mono', monospace",
-        color: '#39e0a0', letterSpacing: 4, fontSize: 12
+        color: '#39e0a0', letterSpacing: 4, fontSize: 12,
       }}>
-        <div>
+        <div style={{ textAlign: 'center' }}>
           <div style={{ marginBottom: 12, opacity: .6 }}>OVERWATCH</div>
           <div style={{ opacity: .3, fontSize: 10 }}>INITIALISING SYSTEMS...</div>
         </div>
@@ -33,34 +33,38 @@ export default function App() {
     )
   }
 
+  // Not signed in — show login page
+  if (!auth.session) {
+    return <LoginPage signIn={auth.signIn} />
+  }
+
+  // Signed in — show the app
   return (
-    <AuthGate>
-      <BrowserRouter>
-        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#07090b', overflow: 'hidden' }}>
-          <Header auth={auth} />
-          <Routes>
-            <Route path="/"              element={<MapView      auth={auth} />} />
-            <Route path="/conus"         element={<ConusView    auth={auth} />} />
-            <Route path="/sealift"       element={<SealiftView  auth={auth} />} />
-            <Route path="/country/:code" element={<CountryView  auth={auth} />} />
-            <Route path="/airbase/:icao" element={<AirbaseView  auth={auth} />} />
+    <BrowserRouter>
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#07090b', overflow: 'hidden' }}>
+        <Header auth={auth} />
+        <Routes>
+          <Route path="/"              element={<MapView      auth={auth} />} />
+          <Route path="/conus"         element={<ConusView    auth={auth} />} />
+          <Route path="/sealift"       element={<SealiftView  auth={auth} />} />
+          <Route path="/country/:code" element={<CountryView  auth={auth} />} />
+          <Route path="/airbase/:icao" element={<AirbaseView  auth={auth} />} />
 
-            <Route path="/admin" element={
-              auth.isAdmin ? <AdminLayout auth={auth} /> : <Navigate to="/" replace />
-            }>
-              <Route index               element={<Navigate to="flights" replace />} />
-              <Route path="flights"      element={<FlightEditor />} />
-              <Route path="units"        element={<UnitManager />} />
-              <Route path="assets"       element={<AssetEditor />} />
-              <Route path="coronets"     element={<CoronetEditor />} />
-              <Route path="countries"    element={<CountryEditor />} />
-              <Route path="users"        element={<UserManager auth={auth} />} />
-            </Route>
+          <Route path="/admin" element={
+            auth.isAdmin ? <AdminLayout auth={auth} /> : <Navigate to="/" replace />
+          }>
+            <Route index               element={<Navigate to="flights" replace />} />
+            <Route path="flights"      element={<FlightEditor />} />
+            <Route path="units"        element={<UnitManager />} />
+            <Route path="assets"       element={<AssetEditor />} />
+            <Route path="coronets"     element={<CoronetEditor />} />
+            <Route path="countries"    element={<CountryEditor />} />
+            <Route path="users"        element={<UserManager auth={auth} />} />
+          </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
-      </BrowserRouter>
-    </AuthGate>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   )
 }
