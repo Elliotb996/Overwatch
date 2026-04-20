@@ -375,6 +375,201 @@ function AirfieldMapTab({asset,auth}) {
   )
 }
 
+// ── DetailPanel: view + edit imagery metadata ────────
+function DetailPanel({img, auth, onDelete, onSaved}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState(null)
+
+  function startEdit() {
+    setForm({
+      label: img.label||'',
+      description: img.description||'',
+      source: img.source||'Satellite',
+      captured_date: img.captured_date||'',
+      tier_required: img.tier_required||'premium',
+      geo_confirmed: !!img.geo_confirmed,
+    })
+    setEditing(true)
+  }
+
+  async function save() {
+    if(!form.label) return
+    setSaving(true)
+    const {error} = await supabase.from('imagery_meta').update({
+      label: form.label,
+      description: form.description,
+      source: form.source,
+      captured_date: form.captured_date||null,
+      tier_required: form.tier_required,
+      geo_confirmed: form.geo_confirmed,
+    }).eq('id', img.id)
+    setSaving(false)
+    if(error){ alert('Save failed: '+error.message); return }
+    setEditing(false)
+    onSaved()
+  }
+
+  const inp = {
+    width:'100%', padding:'7px 10px', background:C.bg,
+    border:`1px solid ${C.br}`, color:C.t1,
+    fontFamily:"'Share Tech Mono',monospace", fontSize:11,
+    borderRadius:1, outline:'none', boxSizing:'border-box'
+  }
+
+  if(editing && form) return (
+    <div style={{flex:1,overflow:'auto'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
+        <span style={{...R,fontSize:13,fontWeight:700,color:C.a,letterSpacing:1}}>EDITING IMAGE METADATA</span>
+        <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+          <button onClick={save} disabled={saving}
+            style={{...R,fontSize:11,fontWeight:700,letterSpacing:1,padding:'5px 18px',
+              background:saving?C.br:C.g,color:C.bg,border:'none',cursor:'pointer',borderRadius:1}}>
+            {saving?'SAVING…':'✓ SAVE'}
+          </button>
+          <button onClick={()=>setEditing(false)}
+            style={{...Z,fontSize:10,padding:'5px 12px',background:'transparent',
+              border:`1px solid ${C.br}`,color:C.t2,cursor:'pointer',borderRadius:1}}>
+            CANCEL
+          </button>
+        </div>
+      </div>
+
+      {/* Image preview (non-editable) */}
+      {img.image_url&&(
+        <a href={img.image_url} target="_blank" rel="noopener noreferrer">
+          <img src={img.image_url} alt={img.label}
+            style={{width:'100%',maxHeight:220,objectFit:'contain',background:'#000',display:'block'}} />
+        </a>
+      )}
+
+      {/* Edit fields */}
+      <div style={{padding:20,display:'flex',flexDirection:'column',gap:12}}>
+        <div>
+          <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>LABEL / TITLE *</div>
+          <input value={form.label} onChange={e=>setForm(f=>({...f,label:e.target.value}))} style={inp} />
+        </div>
+
+        <div>
+          <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>ASSESSMENT / INTEL WRITE-UP</div>
+          <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+            rows={5} placeholder="Describe what the image shows — activity, aircraft, damage, construction..."
+            style={{...inp,resize:'vertical',lineHeight:1.7}} />
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div>
+            <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>SOURCE</div>
+            <select value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))} style={inp}>
+              {['Satellite','Planet Labs','Maxar','Sentinel-2','OSINT','ArmchairAdml','Social Media','Other'].map(s=>(
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>CAPTURED DATE</div>
+            <input type="date" value={form.captured_date} onChange={e=>setForm(f=>({...f,captured_date:e.target.value}))} style={inp} />
+          </div>
+        </div>
+
+        <div>
+          <div style={{...Z,fontSize:8,color:C.t3,marginBottom:6,letterSpacing:2}}>ACCESS TIER — who can view this image</div>
+          <div style={{display:'flex',gap:6}}>
+            {[['analyst','ANALYST','Anyone with access'],['premium','PREMIUM','Paid tier only'],['admin','ADMIN ONLY','Restricted']].map(([val,label,hint])=>(
+              <div key={val} onClick={()=>setForm(f=>({...f,tier_required:val}))}
+                style={{flex:1,padding:'8px 10px',cursor:'pointer',borderRadius:1,textAlign:'center',
+                  background:form.tier_required===val?'rgba(80,160,232,.15)':'transparent',
+                  border:`1px solid ${form.tier_required===val?C.b:C.br}`}}>
+                <div style={{...R,fontSize:12,fontWeight:700,color:form.tier_required===val?C.b:C.t2}}>{label}</div>
+                <div style={{...Z,fontSize:8,color:C.t3,marginTop:2}}>{hint}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',
+          padding:'8px 12px',background:C.bg3,border:`1px solid ${form.geo_confirmed?C.g:C.br}`,borderRadius:1}}>
+          <input type="checkbox" checked={form.geo_confirmed}
+            onChange={e=>setForm(f=>({...f,geo_confirmed:e.target.checked}))}
+            style={{accentColor:C.g,width:14,height:14}} />
+          <div>
+            <div style={{...R,fontSize:12,fontWeight:600,color:form.geo_confirmed?C.g:C.t2}}>GEO-CONFIRMED LOCATION</div>
+            <div style={{...Z,fontSize:8,color:C.t3}}>Location has been verified against satellite reference</div>
+          </div>
+        </label>
+      </div>
+    </div>
+  )
+
+  // ── View mode ──────────────────────────────────────
+  return (
+    <div style={{flex:1,overflow:'auto',display:'flex',flexDirection:'column'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
+        <div style={{flex:1}}>
+          <div style={{...R,fontSize:15,fontWeight:700,color:C.tb}}>{img.label}</div>
+          <div style={{...Z,fontSize:9,color:C.t2}}>{img.source} · {img.captured_date||'Date unknown'}</div>
+        </div>
+        {img.geo_confirmed&&(
+          <span style={{...Z,fontSize:9,color:C.g,border:`1px solid ${C.g}44`,padding:'2px 6px',borderRadius:1}}>✓ GEO</span>
+        )}
+        <a href={img.image_url} target="_blank" rel="noopener noreferrer"
+          style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>
+          ↗ FULL RES
+        </a>
+        {auth?.isAdmin&&(
+          <>
+            <button onClick={startEdit}
+              style={{...Z,fontSize:9,color:C.a,background:'transparent',border:`1px solid ${C.a}44`,padding:'4px 10px',cursor:'pointer',borderRadius:1}}>
+              ✎ EDIT
+            </button>
+            <button onClick={()=>onDelete(img)}
+              style={{...Z,fontSize:9,color:C.r,background:'transparent',border:`1px solid ${C.r}44`,padding:'4px 8px',cursor:'pointer',borderRadius:1}}>
+              🗑 DELETE
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Image */}
+      {img.image_url&&(
+        <a href={img.image_url} target="_blank" rel="noopener noreferrer">
+          <img src={img.image_url} alt={img.label}
+            style={{width:'100%',maxHeight:380,objectFit:'contain',background:'#000',display:'block',cursor:'zoom-in'}} />
+        </a>
+      )}
+
+      {/* Description */}
+      {img.description ? (
+        <div style={{padding:'16px 20px',borderTop:`1px solid ${C.br}`}}>
+          <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:8}}>ASSESSMENT / NOTES</div>
+          <div style={{...Z,fontSize:11,color:C.t1,lineHeight:1.9}}>{img.description}</div>
+        </div>
+      ) : auth?.isAdmin ? (
+        <div style={{padding:'12px 20px',borderTop:`1px solid ${C.br}`}}>
+          <div style={{...Z,fontSize:9,color:C.t3}}>No write-up yet. <span onClick={startEdit} style={{color:C.a,cursor:'pointer',textDecoration:'underline'}}>Add one →</span></div>
+        </div>
+      ) : null}
+
+      {/* Metadata boxes */}
+      <div style={{padding:'12px 20px',borderTop:`1px solid ${C.br}`,display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginTop:'auto'}}>
+        {[
+          {l:'SOURCE',v:img.source||'—'},
+          {l:'CAPTURED',v:img.captured_date||'Unknown'},
+          {l:'ACCESS',v:(img.tier_required||'analyst').toUpperCase()},
+        ].map(({l,v})=>(
+          <div key={l} style={{padding:'8px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
+            <div style={{...Z,fontSize:8,color:C.t3,marginBottom:3}}>{l}</div>
+            <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+
 function ImageryTab({images:initImages,code,auth}) {
   const [images, setImages] = useState(initImages||[])
   const [uploading, setUploading] = useState(false)
@@ -561,44 +756,7 @@ function ImageryTab({images:initImages,code,auth}) {
               {/* Detail panel */}
               {selImg&&(
                 <div style={{flex:1,overflow:'auto'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
-                    <div style={{flex:1}}>
-                      <div style={{...R,fontSize:15,fontWeight:700,color:C.tb}}>{selImg.label}</div>
-                      <div style={{...Z,fontSize:9,color:C.t2}}>{selImg.source} · {selImg.captured_date||'Date unknown'}</div>
-                    </div>
-                    {selImg.geo_confirmed&&<span style={{...Z,fontSize:9,color:C.g,border:`1px solid ${C.g}44`,padding:'2px 6px',borderRadius:1}}>✓ GEO</span>}
-                    <a href={selImg.image_url} target="_blank" rel="noopener noreferrer"
-                      style={{...Z,fontSize:9,color:C.b,padding:'4px 10px',border:`1px solid ${C.b}44`,borderRadius:1,textDecoration:'none'}}>↗ FULL RES</a>
-                    {auth?.isAdmin&&(
-                      <button onClick={()=>deleteImg(selImg)}
-                        style={{...Z,fontSize:9,color:C.r,background:'transparent',border:`1px solid ${C.r}44`,padding:'4px 8px',cursor:'pointer',borderRadius:1}}>🗑 DELETE</button>
-                    )}
-                  </div>
-                  {selImg.image_url&&(
-                    <a href={selImg.image_url} target="_blank" rel="noopener noreferrer">
-                      <img src={selImg.image_url} alt={selImg.label}
-                        style={{width:'100%',maxHeight:380,objectFit:'contain',background:'#000',display:'block',cursor:'zoom-in'}} />
-                    </a>
-                  )}
-                  {selImg.description&&(
-                    <div style={{padding:'16px 20px',borderTop:`1px solid ${C.br}`}}>
-                      <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:8}}>ASSESSMENT / NOTES</div>
-                      <div style={{...Z,fontSize:11,color:C.t1,lineHeight:1.9}}>{selImg.description}</div>
-                    </div>
-                  )}
-                  <div style={{padding:'12px 20px',borderTop:`1px solid ${C.br}`,display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                    {[
-                      {l:'SOURCE',v:selImg.source||'—'},
-                      {l:'CAPTURED',v:selImg.captured_date||'Unknown'},
-                      {l:'ACCESS',v:(selImg.tier_required||'analyst').toUpperCase()},
-                    ].map(({l,v})=>(
-                      <div key={l} style={{padding:'8px 10px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
-                        <div style={{...Z,fontSize:8,color:C.t3,marginBottom:3}}>{l}</div>
-                        <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <DetailPanel img={selImg} auth={auth} onDelete={deleteImg} onSaved={reload} />
               )}
             </>
           )}
