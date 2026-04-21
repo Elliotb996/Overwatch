@@ -627,7 +627,7 @@ export function MapView({ auth }) {
         {[{l:'NAVAL',v:naval,c:C.b},{l:'BASES',v:bases,c:C.g},{l:'LMSR',v:LMSR_DATA.length,c:C.y},{l:'AMC',v:loading?'…':flights.length,c:C.b}].map(({l,v,c})=>(
           <span key={l} style={{...Z,fontSize:10,color:C.t2}}>{l} <b style={{color:c,fontWeight:400}}>{v}</b></span>
         ))}
-        {auth?.isAdmin&&<span style={{...Z,fontSize:9,color:C.r,marginLeft:'auto',letterSpacing:1}}>● ADMIN MODE</span>}
+        {auth?.isOwner&&<span style={{...Z,fontSize:9,color:C.g,marginLeft:'auto',letterSpacing:1}}>◈ OWNER MODE</span>}{auth?.isAdmin&&!auth?.isOwner&&<span style={{...Z,fontSize:9,color:C.a,marginLeft:'auto',letterSpacing:1}}>● ADMIN MODE</span>}
       </div>
 
       {abmAsset && <AbmModal asset={abmAsset} flights={flights} onClose={()=>setAbmAsset(null)} navigate={navigate} />}
@@ -791,35 +791,43 @@ function ADetail({asset,onExpand,flights,navigate,auth,onReposition}) {
       )}
       {asset.type==='lmsr'&&asset.loc&&<DBlk label="POSITION" value={`${asset.loc}\nLast report: ${asset.lastRpt}`} />}
 
-      {/* Carriers use AIR WING section below - skip generic aircraft list */}
+      {/* AIRCRAFT ON STATION — clean row format matching AIR WING style */}
       {asset.aircraftTypes?.length>0&&asset.type!=='carrier'&&(
-        <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>AIRCRAFT ON STATION</div>
-          {asset.aircraftTypes.map((ac,i)=>(
-            <div key={i} style={{marginBottom:6}}>
-              <div onClick={()=>setSelAc(selAc===i?null:i)}
-                style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:selAc===i?'rgba(80,160,232,.08)':C.bg,border:`1px solid ${selAc===i?C.b:C.br}`,borderRadius:1,cursor:ac.tails?.length>0?'pointer':'default'}}>
-                <div style={{flex:1}}>
-                  <div style={{...R,fontSize:13,fontWeight:700,color:C.tb}}>{ac.type}</div>
-                  <div style={{...R,fontSize:9,color:C.t2,marginTop:1}}>{ac.role}</div>
-                </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{...Z,fontSize:16,fontWeight:700,color:C.y,lineHeight:1}}>{ac.qty}</div>
-                  {ac.tails?.length>0&&<div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>{selAc===i?'▲ HIDE':'▼ AIRFRAMES'}</div>}
-                </div>
-              </div>
-              {selAc===i&&ac.tails?.length>0&&(
-                <div style={{padding:'8px 10px',background:'rgba(80,160,232,.04)',border:`1px solid rgba(80,160,232,.15)`,borderTop:'none'}}>
-                  <div style={{...R,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:6}}>CONFIRMED TAIL NUMBERS / CALLSIGNS</div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                    {ac.tails.map((t,j)=>(
-                      <span key={j} style={{...Z,fontSize:9,padding:'2px 6px',background:'rgba(80,160,232,.1)',border:`1px solid rgba(80,160,232,.2)`,color:C.b,borderRadius:1}}>{t}</span>
-                    ))}
+        <div style={{padding:'10px 13px',borderBottom:`1px solid ${C.br}`}}>
+          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:10}}>AIRCRAFT ON STATION</div>
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {asset.aircraftTypes.map((ac,i)=>{
+              const [showTails, setShowTails] = [selAc===i, (v)=>setSelAc(v?i:null)]
+              return (
+                <div key={i}>
+                  <div onClick={()=>ac.tails?.length&&setSelAc(selAc===i?null:i)}
+                    style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',
+                      background:selAc===i?'rgba(80,160,232,.08)':C.bg3,
+                      border:`1px solid ${selAc===i?C.b:C.br}`,borderRadius:1,
+                      cursor:ac.tails?.length?'pointer':'default'}}>
+                    <div style={{flex:1}}>
+                      <div style={{...R,fontSize:13,fontWeight:700,color:C.tb}}>{ac.type}</div>
+                      <div style={{...Z,fontSize:9,color:C.t2,marginTop:1}}>{ac.role}</div>
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <div style={{...Z,fontSize:16,fontWeight:700,color:C.y,lineHeight:1}}>{ac.qty}</div>
+                      {ac.tails?.length>0&&<div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>{selAc===i?'▲ HIDE':'▼ '+ac.tails.length+' AIRFRAMES'}</div>}
+                    </div>
                   </div>
+                  {selAc===i&&ac.tails?.length>0&&(
+                    <div style={{padding:'8px 10px',background:'rgba(80,160,232,.04)',border:`1px solid rgba(80,160,232,.2)`,borderTop:'none',borderRadius:'0 0 1px 1px',marginBottom:2}}>
+                      <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:6}}>TAIL NUMBERS / CALLSIGNS</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                        {ac.tails.map((t,j)=>(
+                          <span key={j} style={{...Z,fontSize:9,padding:'2px 6px',background:'rgba(80,160,232,.1)',border:`1px solid rgba(80,160,232,.2)`,color:C.b,borderRadius:1}}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -979,15 +987,6 @@ function AbmModal({asset,flights,onClose,navigate}) {
             {asset.intel&&<DBlk label="INTEL ASSESSMENT" value={asset.intel} highlight />}
 
             {asset.notes&&<DBlk label="NOTES" value={asset.notes} />}
-      {onReposition&&['carrier','destroyer','submarine','lmsr'].includes(asset.type)&&(
-        <div style={{padding:'6px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <button onClick={()=>onReposition(asset)}
-            style={{display:'block',width:'100%',padding:'7px',...R,fontSize:11,fontWeight:600,letterSpacing:2,
-              border:`1px solid ${C.a}44`,background:'rgba(240,160,64,.06)',color:C.a,cursor:'pointer',borderRadius:1}}>
-            📍 DRAG TO REPOSITION ON MAP
-          </button>
-        </div>
-      )}
           </div>
         )}
         {(tab==='ARRIVALS (INBOUND)'||tab==='DEPARTURES (OUTBOUND)')&&(
@@ -1214,7 +1213,7 @@ function PositionUpdate({asset,auth}) {
 
 // ── SigactPanel: collapsible feed with asset-aware filtering ──
 function SigactPanel({feeds, selAsset}) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   // Filter feed by selected asset name when one is selected
   const items = feeds.length>0
     ? feeds.map(f=>({t:'LIVE',h:f.content_html,id:f.id}))
