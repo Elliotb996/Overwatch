@@ -249,6 +249,8 @@ export function MapView({ auth }) {
     const db = dbByIcao[s.id] || dbByName[s.name?.toLowerCase()]
     if(!db) return s
     // Enrich static with live DB fields
+    // Notes: only override if DB has a real note (>6 chars, not just an ICAO code)
+    const dbNotes = db.notes && db.notes.length > 6 ? db.notes : null
     return {
       ...s,
       status: db.status || s.status,
@@ -257,7 +259,7 @@ export function MapView({ auth }) {
       intel: db.intel_assessment || s.intel,
       lat: db.lat != null ? parseFloat(db.lat) : s.lat,
       lng: db.lng != null ? parseFloat(db.lng) : s.lng,
-      notes: db.notes || s.notes,
+      notes: dbNotes || s.notes,
     }
   })
 
@@ -791,44 +793,9 @@ function ADetail({asset,onExpand,flights,navigate,auth,onReposition}) {
       )}
       {asset.type==='lmsr'&&asset.loc&&<DBlk label="POSITION" value={`${asset.loc}\nLast report: ${asset.lastRpt}`} />}
 
-      {/* AIRCRAFT ON STATION — clean row format matching AIR WING style */}
+      {/* AIRCRAFT ON STATION — role-coloured cards with expandable tails */}
       {asset.aircraftTypes?.length>0&&asset.type!=='carrier'&&(
-        <div style={{padding:'10px 13px',borderBottom:`1px solid ${C.br}`}}>
-          <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:10}}>AIRCRAFT ON STATION</div>
-          <div style={{display:'flex',flexDirection:'column',gap:4}}>
-            {asset.aircraftTypes.map((ac,i)=>{
-              const [showTails, setShowTails] = [selAc===i, (v)=>setSelAc(v?i:null)]
-              return (
-                <div key={i}>
-                  <div onClick={()=>ac.tails?.length&&setSelAc(selAc===i?null:i)}
-                    style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',
-                      background:selAc===i?'rgba(80,160,232,.08)':C.bg3,
-                      border:`1px solid ${selAc===i?C.b:C.br}`,borderRadius:1,
-                      cursor:ac.tails?.length?'pointer':'default'}}>
-                    <div style={{flex:1}}>
-                      <div style={{...R,fontSize:13,fontWeight:700,color:C.tb}}>{ac.type}</div>
-                      <div style={{...Z,fontSize:9,color:C.t2,marginTop:1}}>{ac.role}</div>
-                    </div>
-                    <div style={{textAlign:'right'}}>
-                      <div style={{...Z,fontSize:16,fontWeight:700,color:C.y,lineHeight:1}}>{ac.qty}</div>
-                      {ac.tails?.length>0&&<div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>{selAc===i?'▲ HIDE':'▼ '+ac.tails.length+' AIRFRAMES'}</div>}
-                    </div>
-                  </div>
-                  {selAc===i&&ac.tails?.length>0&&(
-                    <div style={{padding:'8px 10px',background:'rgba(80,160,232,.04)',border:`1px solid rgba(80,160,232,.2)`,borderTop:'none',borderRadius:'0 0 1px 1px',marginBottom:2}}>
-                      <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:6}}>TAIL NUMBERS / CALLSIGNS</div>
-                      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                        {ac.tails.map((t,j)=>(
-                          <span key={j} style={{...Z,fontSize:9,padding:'2px 6px',background:'rgba(80,160,232,.1)',border:`1px solid rgba(80,160,232,.2)`,color:C.b,borderRadius:1}}>{t}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <AircraftOnStation types={asset.aircraftTypes} />
       )}
 
       {asset.escorts?.length>0&&(
@@ -1252,6 +1219,107 @@ function SigactPanel({feeds, selAsset}) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+
+// ── Role metadata for aircraft display ───────────────
+const ROLE_META = {
+  'Strategic Bomber':          { icon:'💣', color:'#e85040' },
+  'Fighter':                   { icon:'⚡', color:'#e85040' },
+  'Strike':                    { icon:'🎯', color:'#f0a040' },
+  'EW':                        { icon:'📡', color:'#a060e8' },
+  'AEW&C':                     { icon:'👁', color:'#50a0e8' },
+  'ISR':                       { icon:'🔭', color:'#50a0e8' },
+  'Tanker':                    { icon:'⛽', color:'#39e0a0' },
+  'SOCOM Assault/Infiltration':{ icon:'🔒', color:'#a060e8' },
+  'Gunship':                   { icon:'💥', color:'#e85040' },
+  'Strategic Airlift':         { icon:'✈',  color:'#4a6070' },
+  'SOCOM Airlift':             { icon:'🔒', color:'#a060e8' },
+}
+
+function getRoleMeta(role='') {
+  for(const [key,val] of Object.entries(ROLE_META)) {
+    if(role.includes(key.split(' ')[0])||role.includes(key)) return val
+  }
+  return { icon:'✈', color:'#4a6070' }
+}
+
+// ── AircraftOnStation: clean role-coloured cards ──────
+function AircraftOnStation({ types }) {
+  const [openIdx, setOpenIdx] = useState(null)
+  return (
+    <div style={{padding:'10px 13px',borderBottom:`1px solid ${C.br}`}}>
+      <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:10}}>
+        AIRCRAFT ON STATION
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {types.map((ac,i) => {
+          const meta = getRoleMeta(ac.role||'')
+          const isOpen = openIdx === i
+          // Shorten very long type names for the narrow panel
+          const shortType = ac.type.length > 22
+            ? ac.type.replace('Globemaster III','Globemaster').replace('Stratofortress','').replace('Thunderbolt II','').replace('Commando II','').trim()
+            : ac.type
+          return (
+            <div key={i} style={{borderRadius:1,overflow:'hidden',border:`1px solid ${isOpen?meta.color+'66':C.br}`}}>
+              {/* Main card row */}
+              <div
+                onClick={()=>setOpenIdx(isOpen?null:i)}
+                style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  padding:'8px 10px',
+                  background: isOpen ? `${meta.color}12` : C.bg3,
+                  cursor: ac.tails?.length ? 'pointer' : 'default',
+                }}>
+                {/* Role icon */}
+                <span style={{fontSize:16,flexShrink:0}}>{meta.icon}</span>
+                {/* Type + role */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{...R,fontSize:12,fontWeight:700,color:C.tb,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {shortType}
+                  </div>
+                  <div style={{...Z,fontSize:8,color:C.t3,marginTop:1,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {ac.role}
+                  </div>
+                </div>
+                {/* Qty + tail toggle */}
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <div style={{...R,fontSize:18,fontWeight:700,color:meta.color,lineHeight:1}}>
+                    {ac.qty}
+                  </div>
+                  {ac.tails?.length>0&&(
+                    <div style={{...Z,fontSize:8,color:C.b,marginTop:2}}>
+                      {isOpen?'▲ HIDE':'▼ '+ac.tails.length+' TAILS'}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Expandable tail numbers */}
+              {isOpen&&ac.tails?.length>0&&(
+                <div style={{padding:'8px 10px',background:'rgba(0,0,0,.2)',borderTop:`1px solid ${meta.color}33`}}>
+                  <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:6}}>
+                    TAIL NUMBERS / CALLSIGNS
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                    {ac.tails.map((t,j)=>(
+                      <span key={j} style={{
+                        ...Z,fontSize:8,padding:'2px 5px',
+                        background:`${meta.color}18`,
+                        border:`1px solid ${meta.color}44`,
+                        color:meta.color,borderRadius:1
+                      }}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

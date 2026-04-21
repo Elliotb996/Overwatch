@@ -24,14 +24,30 @@ export function useAuth() {
     }
   }
 
-  // Upsert profile — fire and forget, never blocks loading
+  // Sync profile — updates email + last_sign_in ONLY, never touches tier
+  // Tier is managed exclusively via admin panel / SQL, not overwritten on login
   function syncProfile(session) {
     if (!session?.user) return
     supabase.from('user_profiles').upsert({
       id: session.user.id,
       email: session.user.email,
       last_sign_in: new Date().toISOString(),
-    }, { onConflict: 'id' }).catch(() => {})
+    }, { onConflict: 'id', ignoreDuplicates: false })
+    .then(({ error }) => {
+      // If upsert created a new row (first login), set tier from JWT
+      if (!error) {
+        supabase.from('user_profiles')
+          .select('tier').eq('id', session.user.id).maybeSingle()
+          .then(({ data }) => {
+            if (data?.tier === 'free') {
+              const jwtTier = getTierFromJwt(session)
+              if (jwtTier && jwtTier !== 'free') {
+                supabase.from('user_profiles').update({ tier: jwtTier }).eq('id', session.user.id).catch(() => {})
+              }
+            }
+          })
+      }
+    }).catch(() => {})
   }
 
   useEffect(() => {
