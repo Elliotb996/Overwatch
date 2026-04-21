@@ -48,16 +48,22 @@ export function UserManager({ auth }) {
 
   async function setTier(userId, newTier) {
     setSaving(userId)
-    // Update user_profiles table — useAuth reads tier from here, not cached JWT
+    // Upsert to handle cases where profile row may not exist yet
     const { error } = await supabase
       .from('user_profiles')
-      .update({ tier: newTier })
-      .eq('id', userId)
-    setSaving(null)
-    if (error) { flash('Failed: ' + error.message, true); return }
-    // Also sync auth metadata (best effort - won't affect active session until re-login)
+      .upsert({ id: userId, tier: newTier }, { onConflict: 'id' })
+    if (error) {
+      // Fallback: try direct update
+      const { error: err2 } = await supabase
+        .from('user_profiles')
+        .update({ tier: newTier })
+        .eq('id', userId)
+      if (err2) { setSaving(null); flash('Failed: ' + err2.message, true); return }
+    }
+    // Sync auth metadata via RPC (best effort)
     await supabase.rpc('admin_set_user_tier', { user_id: userId, new_tier: newTier }).catch(()=>{})
-    flash(`Tier updated → ${newTier.toUpperCase()}`)
+    setSaving(null)
+    flash(`${newTier.toUpperCase()} set`)
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, tier: newTier } : u))
   }
 

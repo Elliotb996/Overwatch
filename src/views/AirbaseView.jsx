@@ -13,16 +13,16 @@ const C={
   bg:'#07090b',bg2:'#0c1018',bg3:'#101620',bg4:'#161e28',br:'#1e2c3a',
 }
 const AC_CAT={
-  'Strategic Bomber':{icon:'💣',color:'#e85040',order:1},
-  'Fighter':{icon:'⚡',color:'#e85040',order:2},
-  'Strike':{icon:'🎯',color:'#f0a040',order:3},
-  'EW':{icon:'📡',color:'#a060e8',order:4},
-  'AEW&C':{icon:'👁',color:'#50a0e8',order:5},
-  'ISR':{icon:'🔭',color:'#50a0e8',order:6},
-  'Tanker':{icon:'⛽',color:'#39e0a0',order:7},
-  'SOCOM Assault/Infiltration':{icon:'🔒',color:'#a060e8',order:8},
-  'Gunship':{icon:'💥',color:'#e85040',order:9},
-  'Strategic Airlift':{icon:'✈',color:'#4a6070',order:10},
+  'Strategic Bomber':{color:'#e85040',order:1},
+  'Fighter':{color:'#e85040',order:2},
+  'Strike':{color:'#f0a040',order:3},
+  'EW':{color:'#a060e8',order:4},
+  'AEW&C':{color:'#50a0e8',order:5},
+  'ISR':{color:'#50a0e8',order:6},
+  'Tanker':{color:'#39e0a0',order:7},
+  'SOCOM Assault/Infiltration':{color:'#a060e8',order:8},
+  'Gunship':{color:'#e85040',order:9},
+  'Strategic Airlift':{color:'#4a6070',order:10},
 }
 
 const STATIC_ASSETS=[
@@ -44,7 +44,7 @@ const STATIC_ASSETS=[
 ]
 
 function TierGate({required,current,children}) {
-  const TO={free:0,analyst:1,premium:2,admin:3}
+  const TO={free:0,analyst:1,premium:2,admin:3,owner:4}
   if((TO[current]||0)>=(TO[required]||0)) return children
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:40,gap:10,textAlign:'center'}}>
@@ -267,15 +267,15 @@ function AircraftTab({aircraft,auth}) {
           <div key={cat} style={{marginBottom:8}}>
             {/* Category header — click to toggle */}
             <div onClick={()=>toggleCat(cat)}
-              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',
-                background:isOpen?`${meta.color}18`:C.bg3,
-                border:`1px solid ${isOpen?meta.color+'60':C.br}`,
+              style={{display:'flex',alignItems:'center',gap:10,padding:'9px 14px',
+                background:isOpen?`${meta.color}12`:C.bg3,
+                border:`1px solid ${isOpen?meta.color+'50':C.br}`,
                 borderRadius:isOpen?'2px 2px 0 0':2,cursor:'pointer',transition:'all .15s'}}>
-              <span style={{fontSize:18}}>{meta.icon}</span>
-              <span style={{...R,fontSize:14,fontWeight:700,color:C.tb,flex:1}}>{cat}</span>
+              <span style={{width:8,height:8,borderRadius:'50%',background:meta.color,flexShrink:0,display:'inline-block'}} />
+              <span style={{...R,fontSize:13,fontWeight:700,color:C.tb,flex:1,letterSpacing:1}}>{cat}</span>
               <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                <span style={{...Z,fontSize:11,color:meta.color,fontWeight:700}}>{acs.length} type{acs.length>1?'s':''}</span>
-                <span style={{...Z,fontSize:10,color:C.t2,transition:'transform .2s',transform:isOpen?'rotate(180deg)':'rotate(0)'}}>▼</span>
+                <span style={{...Z,fontSize:10,color:meta.color}}>{acs.length} type{acs.length>1?'s':''}</span>
+                <span style={{...Z,fontSize:10,color:C.t2,transform:isOpen?'rotate(180deg)':'rotate(0)',display:'inline-block',transition:'transform .2s'}}>▼</span>
               </div>
             </div>
             {/* Expanded content */}
@@ -287,21 +287,14 @@ function AircraftTab({aircraft,auth}) {
                   return (
                     <div key={j} style={{borderBottom:`1px solid rgba(30,44,58,.4)`}}>
                       <div onClick={()=>ac.tails?.length&&setShowTails(tailsOpen?null:tailKey)}
-                        style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',
+                        style={{display:'flex',alignItems:'center',gap:8,padding:'8px 14px',
                           cursor:ac.tails?.length?'pointer':'default',
-                          background:tailsOpen?'rgba(80,160,232,.06)':'transparent',transition:'background .1s'}}>
-                        <div style={{flex:1}}>
-                          <div style={{...R,fontSize:14,fontWeight:600,color:C.tb}}>{ac.type}</div>
-                          <div style={{...R,fontSize:10,color:C.t2,marginTop:2}}>{ac.role}</div>
-                        </div>
-                        <div style={{textAlign:'right'}}>
-                          <div style={{...Z,fontSize:20,fontWeight:700,color:meta.color,lineHeight:1}}>{ac.qty}</div>
-                          {ac.tails?.length>0&&(
-                            <div style={{...Z,fontSize:8,color:C.b,marginTop:3}}>
-                              {tailsOpen?'▲ HIDE':'▼ '+ac.tails.length+' AIRFRAMES'}
-                            </div>
-                          )}
-                        </div>
+                          background:tailsOpen?`${meta.color}0a`:'transparent',transition:'background .1s'}}>
+                        <span style={{...R,fontSize:13,fontWeight:700,color:C.tb,flex:1}}>{ac.type}</span>
+                        <span style={{...Z,fontSize:11,color:meta.color,fontWeight:700,marginRight:ac.tails?.length?8:0}}>{ac.qty}</span>
+                        {ac.tails?.length>0&&(
+                          <span style={{...Z,fontSize:9,color:C.t2}}>{tailsOpen?'▲':'▼'} {ac.tails.length}</span>
+                        )}
                       </div>
                       {tailsOpen&&ac.tails?.length>0&&(
                         <div style={{padding:'10px 16px 14px',background:'rgba(80,160,232,.04)'}}>
