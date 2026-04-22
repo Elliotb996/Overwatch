@@ -114,26 +114,16 @@ function mkIcon(sym, color, size=18, badge=null) {
   })
 }
 
-// ── Track block — absolute positioned, guaranteed 26x24px ───
-function mkTrackBlock(line1, line2, color) {
+// ── Track block — thin rectangle, single line, full designation ─
+// label: full hull e.g. "CVN-78", "DDG-51", "T-AK-304"
+// Width scales to text length. Height fixed at 14px.
+function mkTrackBlock(label, color) {
+  const w = Math.min(Math.max(label.length * 6 + 10, 34), 58)
   return L.divIcon({
     className: '',
-    iconSize: [26, 24],
-    iconAnchor: [13, 12],
-    html: `
-      <div style="
-        position: relative;
-        width: 26px; height: 24px;
-        background: rgba(7,9,11,0.92);
-        border: 1px solid ${color};
-        font-family: 'Share Tech Mono', monospace;
-        box-sizing: border-box;
-        overflow: hidden;
-      ">
-        <div style="position: absolute; top: 1px; left: 0; width: 100%; text-align: center; font-size: 7px; color: ${color}; line-height: 1;">${line1}</div>
-        <div style="position: absolute; bottom: 2px; left: 0; width: 100%; text-align: center; font-size: 9px; color: #dceaf0; font-weight: 700; line-height: 1;">${line2}</div>
-      </div>
-    `
+    iconSize:   [w, 14],
+    iconAnchor: [w / 2, 7],
+    html: `<div style="width:${w}px;height:14px;background:rgba(7,9,11,0.92);border:1px solid ${color};display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;color:#dceaf0;box-sizing:border-box;overflow:hidden;white-space:nowrap;letter-spacing:0.3px;">${label}</div>`,
   })
 }
 
@@ -509,7 +499,7 @@ export function MapView({ auth }) {
 
           {repositionAsset&&repositionPos&&(
             <Marker position={[repositionPos.lat,repositionPos.lng]} draggable={true}
-              icon={mkTrackBlock('REP','OS',C.a)}
+              icon={mkTrackBlock('REPOS',C.a)}
               eventHandlers={{dragend:(e)=>{const p=e.target.getLatLng();setRepositionPos({lat:p.lat,lng:p.lng})}}} />
           )}
 
@@ -552,46 +542,37 @@ export function MapView({ auth }) {
 
           {layers.carriers && allAssets.filter(a => a.type === 'carrier' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
             const col = a.status === 'REFIT' ? C.t3 : a.status === 'SURGE' ? C.r : C.b
-            const rawSub = a.sub?.split('//')[0]?.trim() || ''
-            const parts = rawSub.split('-')
-            const typeCode = 'CV'
-            const hullNum = parts.length > 1 ? parts[1] : a.id.replace(/\D/g, '')
+            const label = (a.hull || a.sub?.split('//')[0]?.trim() || a.id).trim()
             return (
               <Marker key={a.id} position={[a.lat, a.lng]}
-                icon={mkTrackBlock(typeCode, hullNum, col)}
+                icon={mkTrackBlock(label, col)}
                 eventHandlers={{click: () => selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0, -14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: '#dceaf0'}}>{a.name}</span>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
                 </Tooltip>
               </Marker>
             )
           })}
           {layers.destroyers && allAssets.filter(a => a.type === 'destroyer' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
-            const rawSub = a.sub?.split('//')[0]?.trim() || ''
-            const parts = rawSub.split('-')
-            const typeCode = 'DD'
-            const hullNum = parts.length > 1 ? parts[1] : a.id.replace(/\D/g, '')
+            const label = (a.hull || a.sub?.split('//')[0]?.trim() || a.id).trim()
             return (
               <Marker key={a.id} position={[a.lat, a.lng]}
-                icon={mkTrackBlock(typeCode, hullNum, C.b)}
+                icon={mkTrackBlock(label, C.b)}
                 eventHandlers={{click: () => selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0, -14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: '#dceaf0'}}>{a.name}</span>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
                 </Tooltip>
               </Marker>
             )
           })}
           {layers.subs && allAssets.filter(a => a.type === 'submarine' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
-            const rawSub = a.sub?.split('//')[0]?.trim() || ''
-            const parts = rawSub.split('-')
-            const typeCode = 'SS'
-            const hullNum = parts.length > 1 ? parts[1] : a.id.replace(/\D/g, '')
+            const label = (a.hull || a.sub?.split('//')[0]?.trim() || a.id).trim()
             return (
               <Marker key={a.id} position={[a.lat, a.lng]}
-                icon={mkTrackBlock(typeCode, hullNum, C.p)}
+                icon={mkTrackBlock(label, C.p)}
                 eventHandlers={{click: () => selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0, -14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: '#dceaf0'}}>{a.name}</span>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
                 </Tooltip>
               </Marker>
             )
@@ -600,7 +581,7 @@ export function MapView({ auth }) {
             const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
             return (
               <Marker key={s.id} position={[s.lat,s.lng]}
-                icon={mkTrackBlock('LMSR', (s.hull||s.id||'').replace(/T-AK[R]?-/,'').slice(0,5), col)}
+                icon={mkTrackBlock((s.hull||s.id||'').trim(), col)}
                 eventHandlers={{click:()=>selectAsset({...s,type:'lmsr'})}}>
                 <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
                   <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{s.name}</span>
