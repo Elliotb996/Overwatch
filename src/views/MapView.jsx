@@ -720,17 +720,30 @@ export function MapView({ auth }) {
     if(!intel) return {fillOpacity:0,opacity:0,weight:0,interactive:false}
     return {fillColor:'transparent',fillOpacity:0,color:'transparent',weight:0,opacity:0}
   }
-  function onEachFeature(feature,layer) {
+function onEachFeature(feature,layer) {
     const intel = countryIntel.find(c=>c.code===feature.properties.code)
     if(!intel){layer.options.interactive=false;return}
     const e = ESC_GEO[intel.escalation]||ESC_GEO.WATCH
     layer.on({
-      mouseover:ev=>{ev.target.setStyle({fillColor:e.fill,fillOpacity:0.08,color:e.stroke,weight:2,opacity:0.9});ev.target.bringToFront()},
-      mouseout: ev=>ev.target.setStyle({fillOpacity:0,opacity:0,weight:0,color:'transparent'}),
+      mouseover:ev=>{
+        ev.target.setStyle({
+          fillColor:'#ffffff',
+          fillOpacity:0.12,
+          color:'#ffffff',
+          weight:1.5,
+          opacity:0.7
+        })
+        if(ev.target._path) L.DomUtil.addClass(ev.target._path,'ow-country-hover')
+        ev.target.bringToFront()
+      },
+      mouseout: ev=>{
+        ev.target.setStyle({fillOpacity:0,opacity:0,weight:0,color:'transparent'})
+        if(ev.target._path) L.DomUtil.removeClass(ev.target._path,'ow-country-hover')
+      },
       click: ()=>navigate(`/country/${feature.properties.code}`)
     })
     layer.bindTooltip(
-      `<div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#dceaf0;background:rgba(7,9,11,.95);border:1px solid ${e.stroke};padding:5px 12px;border-radius:2px;letter-spacing:1px;pointer-events:none">${intel.name||feature.properties.name} <span style="font-size:9px;color:${e.stroke};margin-left:8px;letter-spacing:2px">${intel.escalation}</span></div>`,
+      `<div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#dceaf0;background:rgba(7,9,11,.95);border:1px solid ${e.color};padding:5px 12px;border-radius:2px;letter-spacing:1px;pointer-events:none">${intel.name||feature.properties.name} <span style="font-size:9px;color:${e.color};margin-left:8px;letter-spacing:2px">${intel.escalation}</span></div>`,
       {sticky:true,opacity:1,className:'ow-country-tip'}
     )
   }
