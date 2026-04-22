@@ -114,30 +114,29 @@ function mkIcon(sym, color, size=18, badge=null) {
   })
 }
 
-// ── Two-line square track block ──────────────────────────────
-// line1: type code (small, coloured) — e.g. "CV", "DD", "LMSR"
-// line2: hull number (larger, white) — e.g. "N-78", "G-51", "304"
-// Fixed 34×26px. No pulse. Tooltip handles hover label.
+// ── Track block — absolute positioned, guaranteed 26x24px ───
 function mkTrackBlock(line1, line2, color) {
   return L.divIcon({
     className: '',
-    iconSize:   [34, 26],
-    iconAnchor: [17, 13],
-    html: `<div style="
-      width:34px;height:26px;
-      background:rgba(7,9,11,0.92);
-      border:1px solid ${color};
-      display:flex;flex-direction:column;
-      align-items:center;justify-content:center;
-      font-family:'Share Tech Mono',monospace;
-      box-sizing:border-box;
-      gap:1px;
-    ">
-      <div style="font-size:7px;color:${color};letter-spacing:0.5px;line-height:1">${line1}</div>
-      <div style="font-size:9px;color:#dceaf0;font-weight:700;letter-spacing:0.5px;line-height:1">${line2}</div>
-    </div>`,
+    iconSize: [26, 24],
+    iconAnchor: [13, 12],
+    html: `
+      <div style="
+        position: relative;
+        width: 26px; height: 24px;
+        background: rgba(7,9,11,0.92);
+        border: 1px solid ${color};
+        font-family: 'Share Tech Mono', monospace;
+        box-sizing: border-box;
+        overflow: hidden;
+      ">
+        <div style="position: absolute; top: 1px; left: 0; width: 100%; text-align: center; font-size: 7px; color: ${color}; line-height: 1;">${line1}</div>
+        <div style="position: absolute; bottom: 2px; left: 0; width: 100%; text-align: center; font-size: 9px; color: #dceaf0; font-weight: 700; line-height: 1;">${line2}</div>
+      </div>
+    `
   })
 }
+
 
 const VIEWS = {
   WORLD:{center:[28,22],zoom:3}, MED:{center:[37,22],zoom:5},
@@ -551,47 +550,48 @@ export function MapView({ auth }) {
             )
           })}
 
-          {layers.carriers&&allAssets.filter(a=>a.type==='carrier'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
-            const col=a.status==='REFIT'?C.t3:a.status==='SURGE'?C.r:C.b
-            // Extract hull designation: prefer explicit hull, fall back to sub prefix
-            // Two-line label: type code top, hull number bottom
-            const sub = a.sub?.split('//')[0]?.trim() || ''
-            const typeCode = a.type==='carrier' ? 'CV' : a.type==='destroyer' ? 'DD' : 'SS'
-            const hullNum = (a.hull || sub).replace(/^(USS|HMS|CVN|DDG|SSN|S\d)/,'').replace(/\D+(\d+).*/,'$1').slice(0,5) || sub.slice(0,5)
+          {layers.carriers && allAssets.filter(a => a.type === 'carrier' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
+            const col = a.status === 'REFIT' ? C.t3 : a.status === 'SURGE' ? C.r : C.b
+            const rawSub = a.sub?.split('//')[0]?.trim() || ''
+            const parts = rawSub.split('-')
+            const typeCode = 'CV'
+            const hullNum = parts.length > 1 ? parts[1] : a.id.replace(/\D/g, '')
             return (
-              <Marker key={a.id} position={[a.lat,a.lng]}
-                icon={mkTrackBlock(typeCode, hullNum||a.id, col)}
-                eventHandlers={{click:()=>selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
+              <Marker key={a.id} position={[a.lat, a.lng]}
+                icon={mkTrackBlock(typeCode, hullNum, col)}
+                eventHandlers={{click: () => selectAsset(a)}}>
+                <Tooltip direction="top" offset={[0, -14]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: '#dceaf0'}}>{a.name}</span>
                 </Tooltip>
               </Marker>
             )
           })}
-          {layers.destroyers&&allAssets.filter(a=>a.type==='destroyer'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
-            const dhull = (a.hull||a.sub?.split('//')[0]?.trim()||a.id||'').trim()
-            const dNum = dhull.replace(/[A-Z]+-/,'').slice(0,5)
-            const dType = dhull.replace(/[-\d].*/,'').slice(0,4) || 'DD'
+          {layers.destroyers && allAssets.filter(a => a.type === 'destroyer' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
+            const rawSub = a.sub?.split('//')[0]?.trim() || ''
+            const parts = rawSub.split('-')
+            const typeCode = 'DD'
+            const hullNum = parts.length > 1 ? parts[1] : a.id.replace(/\D/g, '')
             return (
-              <Marker key={a.id} position={[a.lat,a.lng]}
-                icon={mkTrackBlock(dType, dNum, C.b)}
-                eventHandlers={{click:()=>selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
+              <Marker key={a.id} position={[a.lat, a.lng]}
+                icon={mkTrackBlock(typeCode, hullNum, C.b)}
+                eventHandlers={{click: () => selectAsset(a)}}>
+                <Tooltip direction="top" offset={[0, -14]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: '#dceaf0'}}>{a.name}</span>
                 </Tooltip>
               </Marker>
             )
           })}
-          {layers.subs&&allAssets.filter(a=>a.type==='submarine'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
-            const shull = (a.hull||a.sub?.split('//')[0]?.trim()||a.id||'').trim()
-            const sNum = shull.replace(/[A-Za-z]+-/g,'').replace(/\D+(\d+).*/,'$1').slice(0,5)
-            const sType = shull.replace(/[-\d].*/,'').slice(0,4) || 'SS'
+          {layers.subs && allAssets.filter(a => a.type === 'submarine' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
+            const rawSub = a.sub?.split('//')[0]?.trim() || ''
+            const parts = rawSub.split('-')
+            const typeCode = 'SS'
+            const hullNum = parts.length > 1 ? parts[1] : a.id.replace(/\D/g, '')
             return (
-              <Marker key={a.id} position={[a.lat,a.lng]}
-                icon={mkTrackBlock(sType, sNum, C.p)}
-                eventHandlers={{click:()=>selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
+              <Marker key={a.id} position={[a.lat, a.lng]}
+                icon={mkTrackBlock(typeCode, hullNum, C.p)}
+                eventHandlers={{click: () => selectAsset(a)}}>
+                <Tooltip direction="top" offset={[0, -14]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: '#dceaf0'}}>{a.name}</span>
                 </Tooltip>
               </Marker>
             )
