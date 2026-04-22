@@ -351,6 +351,21 @@ function FlyTo({ target }) {
   return null
 }
 
+// ── Disables Leaflet's rubber-band zoom box (Shift+drag) ──────
+function DisableBoxZoom() {
+  const map = useMap()
+  useEffect(() => { map.boxZoom.disable() }, [map])
+  return null
+}
+
+// ── Auto-closes any open popup when user zooms or pans ────────
+// Prevents stale popup cards floating over wrong map area
+function PopupAutoClose() {
+  const map = useMap()
+  useMapEvents({ zoom: () => map.closePopup(), dragstart: () => map.closePopup() })
+  return null
+}
+
 function MapClickHandler({ onClear, onReposition, repositioning }) {
   useMapEvents({
     click: (e) => {
@@ -360,6 +375,252 @@ function MapClickHandler({ onClear, onReposition, repositioning }) {
   })
   return null
 }
+
+// ══════════════════════════════════════════════════════════════
+// AIRBASE CLUSTER LAYER
+// CLUSTER_MODE: 'fanout' → animated radial fan on click
+//               'zoom'   → auto-zoom into cluster bounding box
+// Change CLUSTER_MODE to 'zoom' to revert to Option A behaviour
+// ══════════════════════════════════════════════════════════════
+const CLUSTER_MODE = 'fanout'
+const CLUSTER_ZOOM_THRESHOLD = 6   // below this zoom, bases cluster
+const CLUSTER_PX_RADIUS = 36       // px radius — bases within this group together
+const FANOUT_SPREAD_PX = 56        // px radius of the fan spread
+
+function computeClusters(assets, map) {
+  const pts = assets.map(a => ({
+    ...a,
+    px: map.latLngToContainerPoint([a.lat, a.lng])
+  }))
+  const assigned = new Set()
+  const clusters = []
+  pts.forEach((a, i) => {
+    if (assigned.has(i)) return
+    const group = [a]
+    assigned.add(i)
+    pts.forEach((b, j) => {
+      if (assigned.has(j)) return
+      const dx = a.px.x - b.px.x, dy = a.px.y - b.px.y
+      if (Math.sqrt(dx*dx + dy*dy) < CLUSTER_PX_RADIUS) { group.push(b); assigned.add(j) }
+    })
+    const cLat = group.reduce((s,x)=>s+x.lat,0)/group.length
+    const cLng = group.reduce((s,x)=>s+x.lng,0)/group.length
+    clusters.push({ id: `cl_${i}`, assets: group, lat: cLat, lng: cLng })
+  })
+  return clusters
+}
+
+function getFanPositions(centerLat, centerLng, count, map) {
+  const center = map.latLngToContainerPoint([centerLat, centerLng])
+  // Spread upward in a 160° arc centred on top
+  const arc = Math.min(count * 32, 160)
+  const startAngle = -90 - arc / 2
+  return Array.from({ length: count }, (_, i) => {
+    const angle = (startAngle + (count > 1 ? (i / (count - 1)) * arc : 0)) * (Math.PI / 180)
+    const px = center.x + Math.cos(angle) * FANOUT_SPREAD_PX
+    const py = center.y + Math.sin(angle) * FANOUT_SPREAD_PX
+    return map.containerPointToLatLng([px, py])
+  })
+}
+
+function mkClusterIcon(count, maxStatus) {
+  const col = maxStatus === 'SURGE' ? '#e85040' : maxStatus === 'ELEVATED' ? '#f0a040' : '#39e0a0'
+  return L.divIcon({
+    className: '',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    html: `<div style="
+      position:relative;width:28px;height:28px;
+    ">
+      <svg viewBox="0 0 20 20" width="28" height="28" style="display:block;overflow:visible">
+        <rect x="4" y="4" width="12" height="12" fill="${col}12" stroke="${col}" stroke-width="1"/>
+        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
+              stroke="${col}" stroke-width="1" fill="none"/>
+        <circle cx="10" cy="10" r="1.6" fill="${col}"/>
+      </svg>
+      <div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;
+        background:${col};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;
+        font-weight:700;display:flex;align-items:center;justify-content:center;
+        border:1px solid #07090b;box-sizing:border-box">${count}</div>
+    </div>`
+  })
+}
+
+function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsset }) {
+  const map = useMap()
+  const [zoom, setZoom] = useState(() => map.getZoom())
+  const [expandedId, setExpandedId] = useState(null)
+  const [fanPositions, setFanPositions] = useState([])
+
+  useMapEvents({
+    zoom:     () => { setZoom(map.getZoom()); setExpandedId(null) },
+    dragstart:() => setExpandedId(null),
+    click:    () => setExpandedId(null),
+  })
+
+  const filtered = assets.filter(a =>
+    a.type === 'airbase' && a.lat != null && a.lng != null &&
+    (country === 'ALL' || a.country?.trim() === country)
+  )
+
+  // Below threshold: cluster
+  if (zoom < CLUSTER_ZOOM_THRESHOLD) {
+    const clusters = computeClusters(filtered, map)
+    return (
+      <>
+        {clusters.map(cl => {
+          const isExpanded = expandedId === cl.id
+          const maxStatus = cl.assets.find(a => a.status === 'SURGE') ? 'SURGE'
+            : cl.assets.find(a => a.status === 'ELEVATED') ? 'ELEVATED' : 'ACTIVE'
+
+          if (cl.assets.length === 1) {
+            // Single base — render normally
+            return <SingleAirbaseMarker key={cl.id} a={cl.assets[0]} flights={flights} selectAsset={selectAsset} setAbmAsset={setAbmAsset} />
+          }
+
+          if (isExpanded && CLUSTER_MODE === 'fanout') {
+            // Fan-out: spread markers at computed positions
+            const positions = fanPositions.length === cl.assets.length ? fanPositions
+              : getFanPositions(cl.lat, cl.lng, cl.assets.length, map)
+            return (
+              <React.Fragment key={cl.id}>
+                {/* Ghost centre marker */}
+                <Marker position={[cl.lat, cl.lng]}
+                  icon={mkClusterIcon(cl.assets.length, maxStatus)}
+                  eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); setExpandedId(null) } }} />
+                {/* Spread markers */}
+                {cl.assets.map((a, i) => {
+                  const pos = positions[i] || { lat: cl.lat, lng: cl.lng }
+                  const col = { SURGE: '#e85040', ELEVATED: '#f0a040', ACTIVE: '#39e0a0', MODERATE: '#50a0e8' }[a.status] || '#4a6070'
+                  const arrivals7d = flights.filter(f =>
+                    f.destination?.toUpperCase() === (a.icao || a.id || '').toUpperCase() &&
+                    f.dep_date && new Date(f.dep_date) >= new Date(Date.now() - 7 * 864e5)
+                  ).length
+                  return (
+                    <Marker key={a.id} position={[pos.lat, pos.lng]}
+                      icon={mkAirbaseIcon(a.status, arrivals7d || a.arrCnt || 0)}
+                      eventHandlers={{ click: (e) => {
+                        L.DomEvent.stopPropagation(e)
+                        selectAsset(a)
+                        setExpandedId(null)
+                      }}}>
+                      <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
+                        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:col}}>
+                          {(a.icao||a.id||'').toUpperCase()}
+                        </span>
+                        <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>
+                          {a.name}
+                        </span>
+                      </Tooltip>
+                    </Marker>
+                  )
+                })}
+              </React.Fragment>
+            )
+          }
+
+          // Collapsed cluster — single multi-base marker
+          return (
+            <Marker key={cl.id} position={[cl.lat, cl.lng]}
+              icon={mkClusterIcon(cl.assets.length, maxStatus)}
+              eventHandlers={{ click: (e) => {
+                L.DomEvent.stopPropagation(e)
+                if (CLUSTER_MODE === 'zoom') {
+                  // Option A: zoom to fit cluster bounds
+                  const bounds = L.latLngBounds(cl.assets.map(a => [a.lat, a.lng]))
+                  map.fitBounds(bounds, { padding: [40, 40] })
+                } else {
+                  // Option B: fan out
+                  const pos = getFanPositions(cl.lat, cl.lng, cl.assets.length, map)
+                  setFanPositions(pos)
+                  setExpandedId(cl.id)
+                }
+              }}}>
+              <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>
+                  {cl.assets.length} airbases
+                </span>
+              </Tooltip>
+            </Marker>
+          )
+        })}
+      </>
+    )
+  }
+
+  // Above threshold: render all individual markers normally
+  return (
+    <>
+      {filtered.map(a => (
+        <SingleAirbaseMarker key={a.id} a={a} flights={flights} selectAsset={selectAsset} setAbmAsset={setAbmAsset} />
+      ))}
+    </>
+  )
+}
+
+// ── Single airbase marker (used both in cluster layer and standalone) ──
+function SingleAirbaseMarker({ a, flights, selectAsset, setAbmAsset }) {
+  const col = { SURGE: C.r, ELEVATED: C.a, ACTIVE: C.g, MODERATE: C.b }[a.status] || C.t2
+  const statusLabel = { SURGE: 'SURGE', ELEVATED: 'ELEVATED', ACTIVE: 'NOMINAL', MODERATE: 'NOMINAL' }[a.status] || 'DORMANT'
+  const icao = (a.icao || a.id || '').toUpperCase()
+  const region = a.sub?.split('//')[1]?.split('—')[0]?.trim() || ''
+  const sevenDaysAgo = new Date(Date.now() - 7 * 864e5)
+  const arrivals7d = flights.filter(f =>
+    f.destination?.toUpperCase() === icao &&
+    f.dep_date && new Date(f.dep_date) >= sevenDaysAgo
+  ).length
+  const depCount = flights.filter(f => f.base?.toUpperCase() === icao).length
+
+  return (
+    <Marker position={[a.lat, a.lng]}
+      icon={mkAirbaseIcon(a.status, arrivals7d || a.arrCnt || 0)}
+      eventHandlers={{ click: () => selectAsset(a) }}>
+      <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip" permanent={false}>
+        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,letterSpacing:1,color:col}}>{icao}</span>
+        <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:8}}>{a.name}</span>
+      </Tooltip>
+      <Popup closeButton={false} className="ow-ab-popup" maxWidth={240} minWidth={230}>
+        <div style={{width:230,background:'#07090b',fontFamily:"'Share Tech Mono',monospace",borderLeft:`2px solid ${col}`}}>
+          <div style={{padding:'8px 10px 5px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:11,fontWeight:700,color:col,letterSpacing:2}}>{icao}</span>
+                {region&&<span style={{fontSize:9,color:'#4a6070',letterSpacing:1}}>{region.toUpperCase()}</span>}
+              </div>
+              <span style={{fontSize:8,color:col,border:`1px solid ${col}`,padding:'2px 6px',letterSpacing:2}}>{statusLabel}</span>
+            </div>
+            <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:16,fontWeight:700,color:'#dceaf0',letterSpacing:0.5,lineHeight:1.2}}>
+              {a.name}
+            </div>
+          </div>
+          <div style={{padding:'5px 10px 6px',display:'flex',alignItems:'baseline',gap:8,borderTop:'1px solid #1e2c3a',borderBottom:'1px solid #1e2c3a'}}>
+            <span style={{fontSize:8,color:'#4a6070',letterSpacing:1}}>ARR</span>
+            <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:16,fontWeight:700,color:col,minWidth:16}}>{a.arrCnt||0}</span>
+            <span style={{fontSize:8,color:'#4a6070',letterSpacing:1,marginLeft:6}}>DEP</span>
+            <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:16,fontWeight:700,color:'#dceaf0',minWidth:16}}>{depCount}</span>
+            <span style={{fontSize:8,color:'#4a6070',letterSpacing:1,marginLeft:6}}>7D</span>
+            <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:16,fontWeight:700,color:'#f0a040',minWidth:18}}>{arrivals7d||a.arrCnt||0}</span>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
+            <div onClick={()=>{ window.location.href=`/airbase/${icao}` }}
+              style={{padding:'7px 10px',cursor:'pointer',display:'flex',alignItems:'center',gap:5,
+                fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:col,
+                borderRight:'1px solid #1e2c3a',userSelect:'none'}}>
+              <span>→</span><span>AIRBASE VIEW</span>
+            </div>
+            <div onClick={()=>{selectAsset(a);setAbmAsset(a)}}
+              style={{padding:'7px 10px',cursor:'pointer',display:'flex',alignItems:'center',gap:5,
+                fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:'#f0a040',
+                justifyContent:'center',userSelect:'none'}}>
+              <span>▼</span><span>EXPAND</span>
+            </div>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  )
+}
+
 
 export function MapView({ auth }) {
   const navigate = useNavigate()
@@ -531,6 +792,8 @@ export function MapView({ auth }) {
         <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false} boxZoom={false}>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
           {countryGeo&&countryIntel.length>0&&<GeoJSON key={geoKey.current} data={countryGeo} style={geoStyle} onEachFeature={onEachFeature} />}
+          <DisableBoxZoom />
+          <PopupAutoClose />
           <FlyTo target={flyTarget} />
           <MapClickHandler repositioning={!!repositionAsset} onClear={()=>{setSelAsset(null);setSelCor(null);setAbmAsset(null)}} onReposition={(pos)=>setRepositionPos(pos)} />
 
@@ -542,77 +805,15 @@ export function MapView({ auth }) {
 
           {selCor&&(()=>{const f=ICAO_COORDS[selCor.from],t=ICAO_COORDS[selCor.to];if(!f||!t)return null;return<Polyline positions={[f,t]} pathOptions={{color:C.a,weight:2.5,dashArray:'8 4',opacity:.85}} />})()}
 
-           {layers.airbases&&allAssets.filter(a=>a.type==='airbase'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
-            const col = {SURGE:C.r,ELEVATED:C.a,ACTIVE:C.g,MODERATE:C.b}[a.status]||C.t2
-            const statusLabel = {SURGE:'SURGE',ELEVATED:'ELEVATED',ACTIVE:'NOMINAL',MODERATE:'NOMINAL'}[a.status]||'DORMANT'
-            const icao = (a.icao||a.id||'').toUpperCase()
-            const region = a.sub?.split('//')[1]?.split('—')[0]?.trim()||''
-            // 7-day arrivals from flights array
-            const sevenDaysAgo = new Date(Date.now()-7*864e5)
-            const arrivals7d = flights.filter(f=>
-              f.destination?.toUpperCase()===icao &&
-              f.dep_date && new Date(f.dep_date)>=sevenDaysAgo
-            ).length
-            const depCount = flights.filter(f=>f.base?.toUpperCase()===icao).length
-            return (
-              <Marker key={a.id} position={[a.lat,a.lng]}
-                icon={mkAirbaseIcon(a.status, arrivals7d||a.arrCnt||0)}
-                eventHandlers={{click:()=>selectAsset(a)}}>
-                {/* Hover tooltip — minimal */}
-                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip" permanent={false}>
-                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,letterSpacing:1,color:col}}>
-                    {icao}
-                  </span>
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:8}}>
-                    {a.name}
-                  </span>
-                </Tooltip>
-                {/* Click popup — full card matching image-1 design */}
-                <Popup closeButton={false} className="ow-ab-popup" maxWidth={300} minWidth={280}>
-                  <div style={{width:280,background:'#07090b',fontFamily:"'Share Tech Mono',monospace",borderLeft:`2px solid ${col}`}}>
-                    {/* Row 1: ICAO + region + status */}
-                    <div style={{padding:'10px 12px 6px'}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontSize:11,fontWeight:700,color:col,letterSpacing:2}}>{icao}</span>
-                          {region&&<span style={{fontSize:9,color:'#4a6070',letterSpacing:1}}>{region.toUpperCase()}</span>}
-                        </div>
-                        <span style={{fontSize:8,color:col,border:`1px solid ${col}`,padding:'2px 7px',letterSpacing:2}}>{statusLabel}</span>
-                      </div>
-                      {/* Airbase name */}
-                      <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:19,fontWeight:700,color:'#dceaf0',letterSpacing:0.5,lineHeight:1.2}}>
-                        {a.name}
-                      </div>
-                    </div>
-                    {/* Row 2: ARR / DEP / 7D stats */}
-                    <div style={{padding:'7px 12px 8px',display:'flex',alignItems:'baseline',gap:8,borderTop:'1px solid #1e2c3a',borderBottom:'1px solid #1e2c3a'}}>
-                      <span style={{fontSize:8,color:'#4a6070',letterSpacing:1}}>ARR</span>
-                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:col,minWidth:20}}>{a.arrCnt||0}</span>
-                      <span style={{fontSize:8,color:'#4a6070',letterSpacing:1,marginLeft:6}}>DEP</span>
-                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:'#dceaf0',minWidth:20}}>{depCount}</span>
-                      <span style={{fontSize:8,color:'#4a6070',letterSpacing:1,marginLeft:6}}>7D</span>
-                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:'#f0a040',minWidth:24}}>{arrivals7d||a.arrCnt||0}</span>
-                    </div>
-                    {/* Row 3: Action buttons */}
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
-                      <div onClick={()=>{ window.location.href=`/airbase/${icao}` }}
-                        style={{padding:'9px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:6,
-                          fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:col,
-                          borderRight:'1px solid #1e2c3a',userSelect:'none'}}>
-                        <span>→</span><span>AIRBASE VIEW</span>
-                      </div>
-                      <div onClick={()=>{selectAsset(a);setAbmAsset(a)}}
-                        style={{padding:'9px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:6,
-                          fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:C.a,
-                          justifyContent:'center',userSelect:'none'}}>
-                        <span>▼</span><span>EXPAND</span>
-                      </div>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          })}
+           {layers.airbases&&(
+            <AirbaseClusterLayer
+              assets={allAssets}
+              flights={flights}
+              country={country}
+              selectAsset={selectAsset}
+              setAbmAsset={setAbmAsset}
+            />
+          )}
           {layers.conus&&Object.entries(byBase).map(([icao,data])=>{
             if(!CONUS_META[icao]) return null
             const meta=CONUS_META[icao], coords=ICAO_COORDS[icao]
