@@ -128,6 +128,41 @@ function mkTrackBlock(label, color) {
 }
 
 
+// ── mkAirbaseIcon — static SVG replica of AirbaseMarker.jsx ──
+// Matches the corner-ticked square design exactly.
+// React hooks version (AirbaseMarker.jsx) is for sidebar/list use.
+// This static version is required for Leaflet's divIcon.
+// Status mapping: SURGE→critical, ELEVATED→elevated, ACTIVE→nominal, else→dormant
+function mkAirbaseIcon(status, alerts = 0) {
+  const cfg = {
+    SURGE:    { color: '#e85040', fill: 'rgba(232,80,64,0.10)'  },
+    ELEVATED: { color: '#f0a040', fill: 'rgba(240,160,64,0.08)' },
+    ACTIVE:   { color: '#39e0a0', fill: 'rgba(57,224,160,0.08)' },
+    MODERATE: { color: '#50a0e8', fill: 'rgba(80,160,232,0.08)' },
+  }
+  const { color, fill } = cfg[status] || { color: '#4a6070', fill: 'transparent' }
+
+  const badge = alerts > 0
+    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${color};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
+    : ''
+
+  return L.divIcon({
+    className: '',
+    iconSize:   [20, 20],
+    iconAnchor: [10, 10],
+    html: `<div style="position:relative;width:20px;height:20px">
+      <svg viewBox="0 0 20 20" width="20" height="20" style="display:block;overflow:visible">
+        <rect x="4" y="4" width="12" height="12" fill="${fill}" stroke="${color}" stroke-width="1"/>
+        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
+              stroke="${color}" stroke-width="1" fill="none"/>
+        <circle cx="10" cy="10" r="1.6" fill="${color}"/>
+      </svg>
+      ${badge}
+    </div>`,
+  })
+}
+
+
 const VIEWS = {
   WORLD:{center:[28,22],zoom:3}, MED:{center:[37,22],zoom:5},
   GULF:{center:[26,52],zoom:5}, ATLANTIC:{center:[44,-30],zoom:4}, INDOPACOM:{center:[20,120],zoom:4},
@@ -490,7 +525,7 @@ export function MapView({ auth }) {
 
       {/* MAP */}
       <div style={{position:'relative',overflow:'hidden'}}>
-        <style>{`.ow-country-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #1e2c3a!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:none!important}.ow-tip::before{display:none!important}`}</style>
+        <style>{`.ow-country-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #2e3f52!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:0 6px 18px rgba(0,0,0,0.55)!important}.ow-tip::before{display:none!important}.ow-ab-tip{padding:9px 12px 10px!important;border-left:2px solid currentColor}`}</style>
         <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
           {countryGeo&&countryIntel.length>0&&<GeoJSON key={geoKey.current} data={countryGeo} style={geoStyle} onEachFeature={onEachFeature} />}
@@ -505,23 +540,35 @@ export function MapView({ auth }) {
 
           {selCor&&(()=>{const f=ICAO_COORDS[selCor.from],t=ICAO_COORDS[selCor.to];if(!f||!t)return null;return<Polyline positions={[f,t]} pathOptions={{color:C.a,weight:2.5,dashArray:'8 4',opacity:.85}} />})()}
 
-          {layers.airbases&&allAssets.filter(a=>a.type==='airbase'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
-            const col=a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g
+           {layers.airbases&&allAssets.filter(a=>a.type==='airbase'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
+            const statusLabel = {SURGE:'SURGE',ELEVATED:'ELEVATED',ACTIVE:'NOMINAL',MODERATE:'NOMINAL'}[a.status]||'DORMANT'
+            const col = {SURGE:C.r,ELEVATED:C.a,ACTIVE:C.g,MODERATE:C.b}[a.status]||C.t2
             return (
-              <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('AB',col,18,a.arrCnt?'+'+a.arrCnt:null)} eventHandlers={{click:()=>selectAsset(a)}}>
-                <Popup closeButton={false}>
-                  <div style={{...Z,fontSize:11,minWidth:190}}>
-                    <div style={{...R,fontSize:14,fontWeight:700,color:C.tb,marginBottom:4}}>{a.name}</div>
-                    <div style={{color:col,marginBottom:2}}>▲{a.arrCnt||0} arrivals tracked</div>
-                    {a.socomCnt>0&&<div style={{color:C.p,marginBottom:4}}>SOCOM: {a.socomCnt}</div>}
-                    <button onClick={()=>{window.location.href=`/airbase/${a.id.toUpperCase()}`}} style={{display:'block',width:'100%',marginTop:6,padding:'5px',...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.b}`,background:'rgba(80,160,232,.08)',color:C.b,cursor:'pointer'}}>→ AIRBASE VIEW</button>
-                    <button onClick={()=>{selectAsset(a);setAbmAsset(a)}} style={{display:'block',width:'100%',marginTop:4,padding:'5px',...R,fontSize:11,fontWeight:600,letterSpacing:2,border:`1px solid ${C.a}`,background:'rgba(240,160,64,.08)',color:C.a,cursor:'pointer'}}>▼ EXPAND DETAIL</button>
+              <Marker key={a.id} position={[a.lat,a.lng]}
+                icon={mkAirbaseIcon(a.status, a.socomCnt||0)}
+                eventHandlers={{click:()=>selectAsset(a)}}>
+                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip ow-ab-tip">
+                  <div style={{minWidth:180,whiteSpace:'nowrap'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:3}}>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:2,color:col}}>{a.icao||a.id?.toUpperCase()}</span>
+                      <span style={{marginLeft:'auto',fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,padding:'2px 6px',color:col,border:`1px solid ${col}`,opacity:0.85}}>{statusLabel}</span>
+                    </div>
+                    <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:600,color:'#dceaf0',marginBottom:a.arrCnt||a.socomCnt>0?7:0}}>
+                      {a.name}
+                    </div>
+                    {a.arrCnt>0&&<div style={{display:'flex',justifyContent:'space-between',gap:20,lineHeight:1.75}}>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1.5,color:'#4a6070'}}>ARRIVALS</span>
+                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:500,color:'#dceaf0'}}>{a.arrCnt} tracked</span>
+                    </div>}
+                    {a.socomCnt>0&&<div style={{display:'flex',justifyContent:'space-between',gap:20,lineHeight:1.75}}>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1.5,color:'#4a6070'}}>SOCOM</span>
+                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:500,color:'#a060e8'}}>{a.socomCnt}</span>
+                    </div>}
                   </div>
-                </Popup>
+                </Tooltip>
               </Marker>
             )
           })}
-
           {layers.conus&&Object.entries(byBase).map(([icao,data])=>{
             if(!CONUS_META[icao]) return null
             const meta=CONUS_META[icao], coords=ICAO_COORDS[icao]
