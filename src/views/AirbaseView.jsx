@@ -205,7 +205,7 @@ function AirbaseOverview({asset,inbound,outbound,socom,auth}) {
         <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'12px 16px',borderBottom:`1px solid ${C.br}`,flexShrink:0}}>LOCATION</div>
         {asset.lat&&asset.lng&&(
           <div style={{flex:1,minHeight:300}}>
-            <MapContainer center={[asset.lat,asset.lng]} zoom={10} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
+            <MapContainer center={[asset.lat,asset.lng]} zoom={13} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
               <Marker position={[asset.lat,asset.lng]}
                 icon={L.divIcon({html:`<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.9);border:2px solid ${stCol};border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:9px;font-weight:700;color:#dceaf0;box-shadow:0 0 16px ${stCol}88">AB</div>`,className:'',iconSize:[28,28],iconAnchor:[14,14]})} />
@@ -358,7 +358,7 @@ function AirfieldMapTab({asset,auth}) {
       </div>
       <TierGate required="analyst" current={auth?.tier||'free'}>
         <div style={{flex:1}}>
-          <MapContainer center={[asset.lat,asset.lng]} zoom={14} style={{width:'100%',height:'100%'}} zoomControl={true} attributionControl={false}>
+          <MapContainer center={[asset.lat,asset.lng]} zoom={15} style={{width:'100%',height:'100%'}} zoomControl={true} attributionControl={false}>
             {mapMode==='satellite'?(
               <TileLayer url={ESRI_SAT} maxZoom={19} />
             ):(

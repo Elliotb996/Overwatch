@@ -574,7 +574,8 @@ function SingleAirbaseMarker({ a, flights, selectAsset, setAbmAsset }) {
   return (
     <Marker position={[a.lat, a.lng]}
       icon={mkAirbaseIcon(a.status, arrivals7d || a.arrCnt || 0)}
-      eventHandlers={{ click: () => selectAsset(a) }}>
+      zIndexOffset={1000}
+      eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); selectAsset(a) } }}>
       <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip" permanent={false}>
         <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,letterSpacing:1,color:col}}>{icao}</span>
         <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:8}}>{a.name}</span>
@@ -788,7 +789,7 @@ export function MapView({ auth }) {
 
       {/* MAP */}
       <div style={{position:'relative',overflow:'hidden'}}>
-        <style>{`.ow-country-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #2e3f52!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:0 6px 18px rgba(0,0,0,0.55)!important}.ow-tip::before{display:none!important}.ow-ab-popup .leaflet-popup-content-wrapper{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;border-radius:2px!important}.ow-ab-popup .leaflet-popup-content{margin:0!important;line-height:1!important}.ow-ab-popup .leaflet-popup-tip-container{display:none!important}`}</style>
+        <style>{`.ow-country-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.leaflet-zoom-box{display:none!important}.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #2e3f52!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:0 6px 18px rgba(0,0,0,0.55)!important}.ow-tip::before{display:none!important}.ow-ab-popup .leaflet-popup-content-wrapper{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;border-radius:2px!important}.ow-ab-popup .leaflet-popup-content{margin:0!important;line-height:1!important}.ow-ab-popup .leaflet-popup-tip-container{display:none!important}`}</style>
         <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false} boxZoom={false}>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
           {countryGeo&&countryIntel.length>0&&<GeoJSON key={geoKey.current} data={countryGeo} style={geoStyle} onEachFeature={onEachFeature} />}
