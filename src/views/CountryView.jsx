@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
@@ -21,22 +21,92 @@ const ESC_COLORS = {
   ACTIVE:  {c:'#50a0e8',bg:'rgba(80,160,232,.1)', border:'rgba(80,160,232,.3)'},
   WATCH:   {c:'#4a6070',bg:'rgba(74,96,112,.1)',  border:'rgba(74,96,112,.3)'},
 }
-const SITE_ICONS = { strike:'💥',nuclear:'☢️',missile:'🚀',naval:'⚓',airbase:'✈',facility:'🏭',radar:'📡' }
+
+// Strike site status → colour. Drives both icon border and list tag.
 const SITE_STATUS_COL = { DESTROYED:C.r, DAMAGED:C.a, ACTIVE:C.g, UNKNOWN:C.t2 }
 
-function mkSiteIcon(emoji, color, selected=false) {
-  const s = selected ? 36 : 28
+// Short type-code rendered in the crosshair reticle centre (4 chars max for legibility).
+// Keeps the marker language OVERWATCH-native rather than emoji-dependent.
+const SITE_TYPE_CODE = {
+  strike:'STR', nuclear:'NUC', missile:'MSL', naval:'NAV',
+  airbase:'AIR', facility:'FAC', radar:'RDR',
+}
+
+// ── mkStrikeIcon — OVERWATCH crosshair marker for strike sites ──
+// Corner-tick square (matches airbase aesthetic) with a NSEW crosshair
+// reticle over the centre. Distinct silhouette from airbase at a glance.
+// Status → border colour. Selected flag adds outer glow.
+function mkStrikeIcon(status='UNKNOWN', selected=false) {
+  const col = SITE_STATUS_COL[status] || C.t2
+  const size = selected ? 24 : 20
+  const glow = selected ? `filter:drop-shadow(0 0 6px ${col});` : ''
   return L.divIcon({
-    html:`<div style="width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.92);border:${selected?2:1.5}px solid ${color};border-radius:3px;font-size:${Math.round(s*.4)}px;box-shadow:0 0 ${selected?16:8}px ${color}${selected?'99':'44'};transition:all .2s">${emoji}</div>`,
-    className:'',iconSize:[s,s],iconAnchor:[s/2,s/2],
+    className: '',
+    iconSize:   [size, size],
+    iconAnchor: [size/2, size/2],
+    html: `<div style="position:relative;width:${size}px;height:${size}px;${glow}">
+      <svg viewBox="0 0 20 20" width="${size}" height="${size}" style="display:block;overflow:visible">
+        <rect x="3" y="3" width="14" height="14" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="${selected?1.5:1}"/>
+        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
+              stroke="${col}" stroke-width="1" fill="none"/>
+        <line x1="10" y1="4.5" x2="10" y2="8" stroke="${col}" stroke-width="1"/>
+        <line x1="10" y1="12" x2="10" y2="15.5" stroke="${col}" stroke-width="1"/>
+        <line x1="4.5" y1="10" x2="8" y2="10" stroke="${col}" stroke-width="1"/>
+        <line x1="12" y1="10" x2="15.5" y2="10" stroke="${col}" stroke-width="1"/>
+        <circle cx="10" cy="10" r="2" fill="none" stroke="${col}" stroke-width="1"/>
+        <circle cx="10" cy="10" r="0.8" fill="${col}"/>
+      </svg>
+    </div>`,
   })
 }
 
-function mkBaseIcon(emoji, color, label='') {
-  const labelHtml = label ? `<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:rgba(7,9,11,.92);border:1px solid ${color}44;color:${color};font-family:'Share Tech Mono',monospace;font-size:7px;padding:1px 4px;white-space:nowrap;pointer-events:none;letter-spacing:1px">${label}</div>` : ''
+// ── mkStrikeCluster — count badge for clustered strikes (low zoom) ──
+// Worst-status wins: if any DESTROYED in cluster → red, else DAMAGED → amber, else grey
+function mkStrikeCluster(count, worstStatus) {
+  const col = SITE_STATUS_COL[worstStatus] || C.r
+  const size = 26
   return L.divIcon({
-    html:`<div style="position:relative;width:24px;height:24px">${labelHtml}<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.92);border:1.5px solid ${color};border-radius:2px;font-size:11px;box-shadow:0 0 8px ${color}44">${emoji}</div></div>`,
-    className:'',iconSize:[24,24],iconAnchor:[12,12],
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    html: `<div style="position:relative;width:${size}px;height:${size}px">
+      <svg viewBox="0 0 20 20" width="${size}" height="${size}" style="display:block;overflow:visible">
+        <rect x="3" y="3" width="14" height="14" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="1.2"/>
+        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
+              stroke="${col}" stroke-width="1" fill="none"/>
+        <line x1="10" y1="5" x2="10" y2="15" stroke="${col}" stroke-width="0.8" opacity="0.5"/>
+        <line x1="5" y1="10" x2="15" y2="10" stroke="${col}" stroke-width="0.8" opacity="0.5"/>
+        <circle cx="10" cy="10" r="2.5" fill="${col}"/>
+      </svg>
+      <div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;
+        background:${col};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;
+        font-weight:700;display:flex;align-items:center;justify-content:center;
+        border:1px solid #07090b;box-sizing:border-box;pointer-events:none">${count}</div>
+    </div>`,
+  })
+}
+
+// ── mkAirbaseMiniIcon — small airbase marker for country view map ──
+// Simplified version of MapView's mkAirbaseIcon — no count badge here;
+// country-view map is about the strike picture, airbases are context.
+function mkAirbaseMiniIcon(col=C.b) {
+  return L.divIcon({
+    className: '',
+    iconSize:   [16, 16],
+    iconAnchor: [8, 8],
+    html: `<svg viewBox="0 0 20 20" width="16" height="16" style="display:block;overflow:visible">
+      <rect x="5" y="5" width="10" height="10" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="1"/>
+      <circle cx="10" cy="10" r="1.2" fill="${col}"/>
+    </svg>`,
+  })
+}
+
+function mkNavalMiniIcon(col=C.b) {
+  return L.divIcon({
+    className: '',
+    iconSize: [30, 12],
+    iconAnchor: [15, 6],
+    html: `<div style="width:30px;height:12px;background:rgba(7,9,11,0.92);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:7px;font-weight:700;color:#dceaf0;letter-spacing:0.5px">NAV</div>`,
   })
 }
 
@@ -45,7 +115,6 @@ function TierGate({required,current,children}) {
   if((TO[current]||0)>=(TO[required]||0)) return children
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,gap:10,background:'rgba(7,9,11,.5)',border:`1px solid ${C.br}`,borderRadius:2,textAlign:'center',margin:16}}>
-      <div style={{fontSize:22,opacity:.3}}>🔒</div>
       <div style={{...R,fontSize:13,fontWeight:700,color:C.t2,letterSpacing:2}}>{required.toUpperCase()} TIER</div>
       <div style={{...Z,fontSize:9,color:C.t3,maxWidth:200}}>Upgrade to access this intelligence layer.</div>
     </div>
@@ -90,6 +159,28 @@ function getCountryZoom(code) {
   return m[code]||5
 }
 
+// ── parseIntelJournal ──
+// Splits intel.notes into dated entries. Accepts either:
+//   "2026-03-28: entry body\n2026-03-26: another entry"
+// or legacy freeform text (treated as one untagged entry).
+// Entries returned newest-first if dates parse.
+function parseIntelJournal(text) {
+  if(!text || !text.trim()) return []
+  // Match lines starting with YYYY-MM-DD: followed by content until next date or EOF
+  const re = /^(\d{4}-\d{2}-\d{2})\s*[:\-—]\s*([\s\S]*?)(?=^\d{4}-\d{2}-\d{2}\s*[:\-—]|\Z)/gm
+  const entries = []
+  let match
+  while((match = re.exec(text)) !== null) {
+    entries.push({ date: match[1], body: match[2].trim() })
+  }
+  if(entries.length === 0) {
+    // No dated entries — treat whole thing as one untagged block
+    return [{ date: null, body: text.trim() }]
+  }
+  // Sort newest first
+  return entries.sort((a,b) => (b.date||'').localeCompare(a.date||''))
+}
+
 export function CountryView({auth}) {
   const {code} = useParams()
   const navigate = useNavigate()
@@ -106,7 +197,6 @@ export function CountryView({auth}) {
   useEffect(()=>{
     async function load(){
       try {
-        // Use maybeSingle() instead of single() — returns null if no row, never throws
         const [
           {data:intel},
           {data:sites},
@@ -130,12 +220,14 @@ export function CountryView({auth}) {
         console.error('CountryView load error:', e)
         setError(e.message)
       } finally {
-        // ALWAYS called — whether success or error
         setLoading(false)
       }
     }
     load()
   },[code])
+
+  // When tab changes, clear selection so STRIKE SITES tab defaults to map view
+  useEffect(()=>{ setSelSite(null) }, [tab])
 
   useEffect(()=>{
     if(selSite && siteListRef.current) {
@@ -182,8 +274,8 @@ export function CountryView({auth}) {
           )}
           <div style={{marginLeft:'auto',display:'flex',gap:12,...Z,fontSize:9,color:C.t3}}>
             <span>▲ {flights.length} flights</span>
-            {hasStrikeSites&&<span>💥 {sites.length} sites</span>}
-            <span>✈ {assets.filter(a=>a.asset_type==='airbase').length} bases</span>
+            {hasStrikeSites&&<span style={{color:C.r}}>⊕ {sites.length} sites</span>}
+            <span>▢ {assets.filter(a=>a.asset_type==='airbase').length} bases</span>
           </div>
         </div>
         <div style={{display:'flex',gap:0,borderTop:`1px solid ${C.br}`}}>
@@ -209,24 +301,31 @@ export function CountryView({auth}) {
   )
 }
 
+// ── OverviewTab ──
+// Layout: 38% left (intel journal + stats) | 62% right (map + site preview).
+// Map fills its panel. Stats are 2-col. Intel is a dated journal.
 function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,code,selSite,setSelSite,onExpandSite}) {
   const airbases = assets.filter(a=>a.asset_type==='airbase')
   const naval = assets.filter(a=>['carrier','destroyer','submarine'].includes(a.asset_type))
+  const journal = parseIntelJournal(intel?.notes)
+
   return (
-    <div style={{flex:1,display:'grid',gridTemplateColumns:'1fr 1fr',overflow:'auto'}}>
-      <div style={{borderRight:`1px solid ${C.br}`,overflow:'auto',padding:24}}>
-        <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginBottom:12}}>INTEL ASSESSMENT</div>
+    <div style={{flex:1,display:'grid',gridTemplateColumns:'minmax(340px, 38%) 1fr',overflow:'hidden'}}>
+
+      {/* LEFT: intel journal + stats */}
+      <div style={{borderRight:`1px solid ${C.br}`,overflow:'auto',padding:'20px 20px 24px'}}>
+
+        {/* Summary block */}
+        <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginBottom:10}}>INTEL ASSESSMENT</div>
         <TierGate required="analyst" current={auth?.tier||'free'}>
-          <div style={{...Z,fontSize:11,color:C.t1,lineHeight:1.9,marginBottom:16}}>{intel?.summary||'No assessment on file.'}</div>
-          {intel?.notes&&(
-            <div style={{padding:'10px 14px',background:C.bg3,borderLeft:`2px solid ${C.a}`,marginBottom:16}}>
-              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:4,letterSpacing:2}}>NOTES</div>
-              <div style={{...Z,fontSize:10,color:C.t2,lineHeight:1.7}}>{intel.notes}</div>
-            </div>
-          )}
+          <div style={{...Z,fontSize:11,color:C.t1,lineHeight:1.9,marginBottom:16,padding:'12px 14px',background:C.bg3,borderLeft:`2px solid ${C.b}`,borderRadius:1}}>
+            {intel?.summary || 'No assessment on file.'}
+          </div>
         </TierGate>
-        <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginTop:20,marginBottom:12}}>QUICK STATS</div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:20}}>
+
+        {/* Quick stats — 2 column */}
+        <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginTop:18,marginBottom:10}}>QUICK STATS</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
           {[
             {v:flights.length,l:'AMC FLIGHTS',c:C.b},
             {v:hasStrikeSites?sites.length:0,l:'STRIKE SITES',c:C.r},
@@ -241,17 +340,47 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
             </div>
           ))}
         </div>
+
+        {/* Intel journal — dated entries, newest first */}
+        {journal.length > 0 && (
+          <>
+            <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginTop:18,marginBottom:10}}>
+              <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3}}>INTEL JOURNAL</div>
+              <div style={{...Z,fontSize:8,color:C.t3}}>{journal.length} {journal.length===1?'entry':'entries'}</div>
+            </div>
+            <TierGate required="analyst" current={auth?.tier||'free'}>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {journal.map((entry,i)=>(
+                  <div key={i} style={{padding:'10px 12px',background:C.bg3,border:`1px solid ${C.br}`,borderLeft:`2px solid ${i===0?C.a:C.t3}`,borderRadius:1}}>
+                    {entry.date && (
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                        <span style={{...Z,fontSize:10,fontWeight:700,color:i===0?C.a:C.t2,letterSpacing:1}}>{entry.date}</span>
+                        {i===0 && <span style={{...Z,fontSize:8,color:C.a,padding:'1px 5px',border:`1px solid ${C.a}44`,letterSpacing:1}}>LATEST</span>}
+                      </div>
+                    )}
+                    <div style={{...Z,fontSize:10,color:C.t1,lineHeight:1.7,whiteSpace:'pre-wrap'}}>{entry.body}</div>
+                  </div>
+                ))}
+              </div>
+            </TierGate>
+          </>
+        )}
+
+        {/* Tracked bases */}
         {airbases.length>0&&(
           <>
-            <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginBottom:10}}>TRACKED BASES</div>
+            <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginTop:18,marginBottom:10}}>TRACKED BASES</div>
             {airbases.map(a=>(
               <div key={a.id} onClick={()=>navigate(`/airbase/${a.icao_code||a.id}`)}
                 style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',marginBottom:4,background:C.bg3,border:`1px solid ${C.br}`,cursor:'pointer',borderRadius:1,transition:'border-color .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=C.b}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=C.br}>
-                <span style={{fontSize:14}}>✈</span>
-                <div style={{flex:1}}>
-                  <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{a.name}</div>
+                <svg viewBox="0 0 20 20" width="14" height="14" style={{flexShrink:0}}>
+                  <rect x="5" y="5" width="10" height="10" fill="none" stroke={C.g} strokeWidth="1"/>
+                  <circle cx="10" cy="10" r="1.2" fill={C.g}/>
+                </svg>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{...R,fontSize:13,fontWeight:600,color:C.tb,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.name}</div>
                   <div style={{...Z,fontSize:9,color:C.t2}}>{a.designation||a.icao_code}</div>
                 </div>
                 <div style={{...Z,fontSize:9,color:a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g}}>{a.status}</div>
@@ -261,26 +390,33 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
           </>
         )}
       </div>
+
+      {/* RIGHT: map + site preview strip */}
       <div style={{display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'12px 16px',borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
-          {hasStrikeSites?'STRIKE SITES & ASSETS':'ASSETS MAP'}
-          {selSite&&<span style={{color:C.a,marginLeft:8}}>● {selSite.name}</span>}
+        <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'10px 16px',borderBottom:`1px solid ${C.br}`,flexShrink:0,display:'flex',alignItems:'center',gap:10}}>
+          <span>{hasStrikeSites?'STRIKE SITES & ASSETS':'ASSETS MAP'}</span>
+          {hasStrikeSites && <span style={{color:C.t3}}>·</span>}
+          {hasStrikeSites && <span style={{...Z,fontSize:8,color:C.t3}}>{sites.length} sites tracked</span>}
+          {selSite && <span style={{color:C.a,marginLeft:'auto',...Z,fontSize:9}}>● {selSite.name}</span>}
         </div>
         <TierGate required="analyst" current={auth?.tier||'free'}>
-          <div style={{flex:1,minHeight:300}}>
+          <div style={{flex:1,minHeight:300,position:'relative'}}>
             <CountryMap sites={hasStrikeSites?sites:[]} assets={assets} code={code} selSite={selSite} setSelSite={setSelSite} onExpand={onExpandSite} />
           </div>
         </TierGate>
-        {hasStrikeSites&&sites.slice(0,5).length>0&&(
-          <div style={{flexShrink:0,borderTop:`1px solid ${C.br}`,maxHeight:180,overflow:'auto'}}>
+        {hasStrikeSites && sites.length>0 && (
+          <div style={{flexShrink:0,borderTop:`1px solid ${C.br}`,maxHeight:160,overflow:'auto',background:C.bg2}}>
             <TierGate required="analyst" current={auth?.tier||'free'}>
+              <div style={{padding:'6px 12px',...Z,fontSize:8,color:C.t3,letterSpacing:2,borderBottom:`1px solid ${C.br}`}}>
+                RECENT STRIKES ({Math.min(5,sites.length)} of {sites.length})
+              </div>
               {sites.slice(0,5).map(s=>(
                 <div key={s.id} onClick={()=>setSelSite(selSite?.id===s.id?null:s)}
-                  style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderBottom:`1px solid rgba(30,44,58,.4)`,cursor:'pointer',background:selSite?.id===s.id?'rgba(80,160,232,.06)':'transparent'}}>
-                  <span style={{fontSize:13}}>{SITE_ICONS[s.site_type]||'💥'}</span>
-                  <div style={{flex:1}}>
-                    <div style={{...R,fontSize:12,fontWeight:600,color:C.tb}}>{s.name}</div>
-                    <div style={{...Z,fontSize:8,color:C.t2}}>{s.strike_date} · {s.source}</div>
+                  style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',borderBottom:`1px solid rgba(30,44,58,.4)`,cursor:'pointer',background:selSite?.id===s.id?'rgba(80,160,232,.06)':'transparent'}}>
+                  <SiteTypeGlyph type={s.site_type} color={SITE_STATUS_COL[s.status]||C.t2} />
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{...R,fontSize:12,fontWeight:600,color:C.tb,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name}</div>
+                    <div style={{...Z,fontSize:8,color:C.t2}}>{s.strike_date||'—'} · {s.source||'—'}</div>
                   </div>
                   <span style={{...Z,fontSize:9,color:SITE_STATUS_COL[s.status]||C.t2}}>{s.status}</span>
                 </div>
@@ -293,59 +429,236 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
   )
 }
 
+// ── SiteTypeGlyph ──
+// Small SVG glyph replacing emojis in lists — matches platform design language.
+// Type → subtle variation in centre shape; status drives colour.
+function SiteTypeGlyph({type, color}) {
+  const shape = {
+    nuclear: <polygon points="10,4 14,12 6,12" fill={color}/>,
+    missile: <rect x="8" y="4" width="4" height="12" fill={color}/>,
+    naval:   <path d="M4,12 L10,6 L16,12 L14,14 L6,14 Z" fill={color}/>,
+    airbase: <circle cx="10" cy="10" r="3" fill={color}/>,
+    facility:<rect x="5" y="7" width="10" height="8" fill={color}/>,
+    radar:   <circle cx="10" cy="10" r="4" fill="none" stroke={color} strokeWidth="1.5"/>,
+    strike:  <g><line x1="5" y1="5" x2="15" y2="15" stroke={color} strokeWidth="1.5"/><line x1="15" y1="5" x2="5" y2="15" stroke={color} strokeWidth="1.5"/></g>,
+  }[type] || <circle cx="10" cy="10" r="2" fill={color}/>
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" style={{flexShrink:0}}>
+      <rect x="1" y="1" width="18" height="18" fill="rgba(7,9,11,0.6)" stroke={color} strokeWidth="1"/>
+      {shape}
+    </svg>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// STRIKE SITE CLUSTER LAYER
+// Mirrors AirbaseClusterLayer in MapView. Below zoom threshold, sites within
+// px radius collapse into one count-badge marker. Click to fan out.
+// ══════════════════════════════════════════════════════════════
+const SITE_CLUSTER_ZOOM = 7   // below this zoom, cluster
+const SITE_CLUSTER_PX   = 32  // merge radius
+const SITE_FAN_PX       = 52  // fan spread radius
+
+function computeSiteClusters(items, map) {
+  const pts = items.map(s => ({
+    ...s,
+    px: map.latLngToContainerPoint([parseFloat(s.lat), parseFloat(s.lng)])
+  }))
+  const assigned = new Set()
+  const clusters = []
+  pts.forEach((a, i) => {
+    if(assigned.has(i)) return
+    const group = [a]; assigned.add(i)
+    pts.forEach((b, j) => {
+      if(assigned.has(j)) return
+      const dx = a.px.x - b.px.x, dy = a.px.y - b.px.y
+      if(Math.sqrt(dx*dx + dy*dy) < SITE_CLUSTER_PX) { group.push(b); assigned.add(j) }
+    })
+    const cLat = group.reduce((s,x)=>s+parseFloat(x.lat),0)/group.length
+    const cLng = group.reduce((s,x)=>s+parseFloat(x.lng),0)/group.length
+    clusters.push({ id:`sc_${i}`, sites:group, lat:cLat, lng:cLng })
+  })
+  return clusters
+}
+
+function getSiteFanPositions(centerLat, centerLng, count, map) {
+  const center = map.latLngToContainerPoint([centerLat, centerLng])
+  const arc = Math.min(count * 30, 200)
+  const startAngle = -90 - arc / 2
+  return Array.from({length: count}, (_, i) => {
+    const angle = (startAngle + (count > 1 ? (i / (count - 1)) * arc : 0)) * (Math.PI / 180)
+    const px = center.x + Math.cos(angle) * SITE_FAN_PX
+    const py = center.y + Math.sin(angle) * SITE_FAN_PX
+    return map.containerPointToLatLng([px, py])
+  })
+}
+
+function worstStatusOf(sites) {
+  if(sites.some(s => s.status === 'DESTROYED')) return 'DESTROYED'
+  if(sites.some(s => s.status === 'DAMAGED'))   return 'DAMAGED'
+  if(sites.some(s => s.status === 'ACTIVE'))    return 'ACTIVE'
+  return 'UNKNOWN'
+}
+
+function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
+  const map = useMap()
+  const [zoom, setZoom] = useState(() => map.getZoom())
+  const [expandedId, setExpandedId] = useState(null)
+  const [fanPositions, setFanPositions] = useState([])
+
+  useMapEvents({
+    zoom:      () => { setZoom(map.getZoom()); setExpandedId(null) },
+    dragstart: () => setExpandedId(null),
+    click:     () => setExpandedId(null),
+  })
+
+  const valid = sites.filter(s => s.lat && s.lng)
+
+  // Above threshold: all markers rendered individually
+  if(zoom >= SITE_CLUSTER_ZOOM) {
+    return (
+      <>
+        {valid.map(s => (
+          <SingleSiteMarker key={s.id} site={s} selSite={selSite} setSelSite={setSelSite} onExpand={onExpand} />
+        ))}
+      </>
+    )
+  }
+
+  // Below threshold: cluster
+  const clusters = computeSiteClusters(valid, map)
+  return (
+    <>
+      {clusters.map(cl => {
+        if(cl.sites.length === 1) {
+          return <SingleSiteMarker key={cl.id} site={cl.sites[0]} selSite={selSite} setSelSite={setSelSite} onExpand={onExpand} />
+        }
+        const isExpanded = expandedId === cl.id
+        const worst = worstStatusOf(cl.sites)
+
+        if(isExpanded) {
+          const positions = fanPositions.length === cl.sites.length ? fanPositions
+            : getSiteFanPositions(cl.lat, cl.lng, cl.sites.length, map)
+          return (
+            <div key={cl.id}>
+              <Marker position={[cl.lat, cl.lng]}
+                icon={mkStrikeCluster(cl.sites.length, worst)}
+                eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setExpandedId(null)}}} />
+              {cl.sites.map((s, i) => {
+                const pos = positions[i] || {lat:cl.lat, lng:cl.lng}
+                return (
+                  <Marker key={s.id} position={[pos.lat, pos.lng]}
+                    icon={mkStrikeIcon(s.status, selSite?.id === s.id)}
+                    eventHandlers={{click:(e)=>{
+                      L.DomEvent.stopPropagation(e)
+                      setSelSite(selSite?.id === s.id ? null : s)
+                      setExpandedId(null)
+                    }}}>
+                    <Tooltip direction="top" offset={[0,-12]} opacity={1} className="ow-tip">
+                      <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>{s.name}</span>
+                    </Tooltip>
+                  </Marker>
+                )
+              })}
+            </div>
+          )
+        }
+
+        return (
+          <Marker key={cl.id} position={[cl.lat, cl.lng]}
+            icon={mkStrikeCluster(cl.sites.length, worst)}
+            eventHandlers={{click:(e)=>{
+              L.DomEvent.stopPropagation(e)
+              const pos = getSiteFanPositions(cl.lat, cl.lng, cl.sites.length, map)
+              setFanPositions(pos)
+              setExpandedId(cl.id)
+            }}}>
+            <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
+              <span style={{...R,fontSize:12,fontWeight:700,color:C.tb}}>{cl.sites.length} strike sites</span>
+              <span style={{...Z,fontSize:9,color:SITE_STATUS_COL[worst]||C.t2,marginLeft:6}}>{worst}</span>
+            </Tooltip>
+          </Marker>
+        )
+      })}
+    </>
+  )
+}
+
+function SingleSiteMarker({site, selSite, setSelSite, onExpand}) {
+  const isSel = selSite?.id === site.id
+  const col = SITE_STATUS_COL[site.status] || C.t2
+  return (
+    <Marker position={[parseFloat(site.lat), parseFloat(site.lng)]}
+      icon={mkStrikeIcon(site.status, isSel)}
+      eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setSelSite(isSel ? null : site)}}}>
+      <Tooltip direction="top" offset={[0,-12]} opacity={1} className="ow-tip">
+        <span style={{...Z,fontSize:9,color:col,letterSpacing:1}}>{SITE_TYPE_CODE[site.site_type]||'STR'}</span>
+        <span style={{...R,fontSize:12,fontWeight:700,color:C.tb,marginLeft:6}}>{site.name}</span>
+      </Tooltip>
+      <Popup closeButton={false}>
+        <div style={{...Z,fontSize:10,minWidth:200}}>
+          <div style={{...R,fontSize:13,fontWeight:700,color:C.tb,marginBottom:3}}>{site.name}</div>
+          <div style={{color:col,marginBottom:3,fontSize:9,letterSpacing:1}}>{site.status} · {site.site_type?.toUpperCase()}</div>
+          {site.geo_confirmed&&<div style={{...Z,fontSize:8,color:C.g,marginBottom:3}}>✓ GEO CONFIRMED</div>}
+          <div style={{color:C.t2,fontSize:9,lineHeight:1.5}}>{(site.description||'').slice(0,100)}{site.description?.length>100?'...':''}</div>
+          <div onClick={()=>{ setSelSite(site); onExpand?.(site) }} style={{...R,fontSize:10,fontWeight:600,color:C.a,marginTop:6,cursor:'pointer',letterSpacing:1}}>▼ EXPAND DETAIL →</div>
+        </div>
+      </Popup>
+    </Marker>
+  )
+}
+
+// ── CountryMap ──
+// Base tile + strike cluster layer + airbases/naval context markers.
+// Shared inline CSS lifted from MapView for tooltip styling.
 function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
   const navToBase = useNavigate()
   const center = getCountryCenter(code)
   const zoom = getCountryZoom(code)
+  const airbases = assets.filter(a => a.lat && a.lng && a.asset_type === 'airbase')
+  const naval = assets.filter(a => a.lat && a.lng && ['carrier','destroyer','submarine'].includes(a.asset_type))
+
   return (
-    <MapContainer key={code} center={center} zoom={zoom} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
-      {sites.filter(s=>s.lat&&s.lng).map(s=>{
-        const isSel = selSite?.id===s.id
-        const col = SITE_STATUS_COL[s.status]||C.r
-        return (
-          <Marker key={s.id} position={[parseFloat(s.lat),parseFloat(s.lng)]}
-            icon={mkSiteIcon(SITE_ICONS[s.site_type]||'💥', col, isSel)}
-            eventHandlers={{click:()=>setSelSite(isSel?null:s)}}>
-            <Popup closeButton={false}>
-              <div style={{...Z,fontSize:10,minWidth:180}}>
-                <div style={{...R,fontSize:13,fontWeight:700,color:C.tb,marginBottom:3}}>{s.name}</div>
-                <div style={{color:col,marginBottom:3,fontSize:9,letterSpacing:1}}>{s.status} · {s.site_type?.toUpperCase()}</div>
-                {s.geo_confirmed&&<div style={{...Z,fontSize:8,color:C.g,marginBottom:3}}>✓ GEO CONFIRMED</div>}
-                <div style={{color:C.t2,fontSize:9,lineHeight:1.5}}>{s.description?.slice(0,100)}...</div>
-                <div onClick={()=>{ setSelSite(s); onExpand?.(s) }} style={{...R,fontSize:10,fontWeight:600,color:C.a,marginTop:6,cursor:'pointer',letterSpacing:1}}>▼ EXPAND DETAIL →</div>
-              </div>
-            </Popup>
+    <>
+      <style>{`.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #2e3f52!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:0 6px 18px rgba(0,0,0,0.55)!important}.ow-tip::before{display:none!important}`}</style>
+      <MapContainer key={code} center={center} zoom={zoom} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
+        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
+        {sites.length > 0 && (
+          <StrikeSiteClusterLayer sites={sites} selSite={selSite} setSelSite={setSelSite} onExpand={onExpand} />
+        )}
+        {airbases.map(a=>(
+          <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]}
+            icon={mkAirbaseMiniIcon(a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g)}
+            eventHandlers={{click:()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}}>
+            <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
+              <span style={{...Z,fontSize:9,color:C.g}}>{(a.icao_code||'').toUpperCase()}</span>
+              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb,marginLeft:6}}>{a.name}</span>
+            </Tooltip>
           </Marker>
-        )
-      })}
-      {assets.filter(a=>a.lat&&a.lng&&['airbase','carrier','destroyer'].includes(a.asset_type)).map(a=>(
-        <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]}
-          icon={mkBaseIcon(a.asset_type==='airbase'?'✈':'🚢', a.asset_type==='airbase'?C.a:C.b, a.asset_type==='airbase'?(a.icao_code||'').toUpperCase():'')}
-          eventHandlers={a.asset_type==='airbase'?{click:()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}:{}}>
-          <Popup closeButton={false}>
-            <div style={{...Z,fontSize:10,minWidth:160}}>
-              <div style={{...R,fontSize:12,fontWeight:700,color:C.tb,marginBottom:4}}>{a.name}</div>
-              <div style={{...Z,fontSize:9,color:C.t2,marginBottom:6}}>{a.designation||a.icao_code}</div>
-              {a.asset_type==='airbase'&&(
-                <div style={{...R,fontSize:10,fontWeight:600,color:C.b,cursor:'pointer',letterSpacing:1}}
-                  onClick={()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}>
-                  → AIRBASE VIEW
-                </div>
-              )}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+        ))}
+        {naval.map(a=>(
+          <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]} icon={mkNavalMiniIcon(C.b)}>
+            <Tooltip direction="top" offset={[0,-8]} opacity={1} className="ow-tip">
+              <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>{a.name}</span>
+            </Tooltip>
+          </Marker>
+        ))}
+      </MapContainer>
+    </>
   )
 }
 
+// ── StrikeSitesTab ──
+// Split: 320px list | map or detail pane.
+// Selection toggles between map (default) and detail. No blank state.
 function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
   return (
     <div style={{flex:1,display:'grid',gridTemplateColumns:'320px 1fr',overflow:'hidden'}}>
       <div ref={siteListRef} style={{borderRight:`1px solid ${C.br}`,overflow:'auto'}}>
         <TierGate required="analyst" current={auth?.tier||'free'}>
+          <div style={{padding:'8px 14px',...Z,fontSize:9,color:C.t3,letterSpacing:2,borderBottom:`1px solid ${C.br}`,background:C.bg4}}>
+            {sites.length} SITES · Click to focus
+          </div>
           {sites.length===0&&<div style={{...Z,fontSize:10,color:C.t3,padding:20}}>No strike sites logged.</div>}
           {sites.map(s=>{
             const sc = SITE_STATUS_COL[s.status]||C.t2
@@ -357,9 +670,9 @@ function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
                   background:isSel?'rgba(80,160,232,.08)':'transparent',
                   borderLeft:`3px solid ${isSel?C.b:'transparent'}`,transition:'all .15s'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
-                  <span style={{fontSize:16}}>{SITE_ICONS[s.site_type]||'💥'}</span>
-                  <div style={{flex:1}}>
-                    <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{s.name}</div>
+                  <SiteTypeGlyph type={s.site_type} color={sc} />
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{...R,fontSize:13,fontWeight:600,color:C.tb,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name}</div>
                     <div style={{...Z,fontSize:8,color:C.t2}}>{s.site_type?.toUpperCase()} · {s.strike_date||'Date unknown'}</div>
                   </div>
                   <span style={{...Z,fontSize:9,padding:'1px 5px',borderRadius:1,color:sc,background:`${sc}22`}}>{s.status}</span>
@@ -379,11 +692,13 @@ function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
           <SiteDetail site={selSite} auth={auth} onClose={()=>setSelSite(null)} />
         ) : (
           <>
-            <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'10px 14px',borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
-              STRIKE SITES MAP — Click marker or list item to expand
+            <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,padding:'10px 14px',borderBottom:`1px solid ${C.br}`,flexShrink:0,display:'flex',alignItems:'center',gap:10}}>
+              <span>STRIKE SITES MAP</span>
+              <span style={{color:C.t3}}>·</span>
+              <span style={{...Z,fontSize:8,color:C.t3}}>Click marker or list item to expand</span>
             </div>
             <TierGate required="analyst" current={auth?.tier||'free'}>
-              <div style={{flex:1,minHeight:400}}>
+              <div style={{flex:1,minHeight:400,position:'relative'}}>
                 <CountryMap sites={sites} assets={[]} code={code} selSite={selSite} setSelSite={setSelSite} />
               </div>
             </TierGate>
@@ -399,8 +714,8 @@ function SiteDetail({site,auth,onClose}) {
   return (
     <div style={{overflow:'auto',height:'100%'}}>
       <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
-        <span style={{fontSize:22}}>{SITE_ICONS[site.site_type]||'💥'}</span>
-        <div style={{flex:1}}>
+        <SiteTypeGlyph type={site.site_type} color={sc} />
+        <div style={{flex:1,minWidth:0}}>
           <div style={{...R,fontSize:17,fontWeight:700,color:C.tb}}>{site.name}</div>
           <div style={{...Z,fontSize:9,color:C.t2}}>{site.site_type?.toUpperCase()}</div>
         </div>
@@ -446,7 +761,7 @@ function SiteDetail({site,auth,onClose}) {
             <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>SOURCE / X POST</div>
             <a href={site.x_url} target="_blank" rel="noopener noreferrer"
               style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textDecoration:'none'}}>
-              <span style={{fontSize:16}}>𝕏</span>
+              <span style={{...Z,fontSize:14,color:C.tb}}>𝕏</span>
               <div>
                 <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{site.x_username||'View on X'}</div>
                 <div style={{...Z,fontSize:9,color:C.b}}>↗ Open post</div>
@@ -462,7 +777,6 @@ function SiteDetail({site,auth,onClose}) {
           </div>
         ) : (
           <div style={{padding:'16px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1,textAlign:'center',...Z,fontSize:9,color:C.t3,marginBottom:16}}>
-            <div style={{fontSize:18,marginBottom:6,opacity:.3}}>🛰</div>
             No imagery catalogued. Add via admin panel.
           </div>
         )}
@@ -558,7 +872,6 @@ function ImageryTab({assetId,auth}) {
       <TierGate required="premium" current={auth?.tier||'free'}>
         {images.length===0?(
           <div style={{textAlign:'center',padding:40,...Z,fontSize:10,color:C.t3}}>
-            <div style={{fontSize:24,marginBottom:12,opacity:.3}}>🛰</div>
             No imagery catalogued for this country yet.
           </div>
         ):(
