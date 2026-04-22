@@ -41,6 +41,33 @@ body {
 .leaflet-popup-close-button { color: #4a6070 !important; }
 .leaflet-popup-close-button:hover { color: #dceaf0 !important; }
 
+/* ── Kill browser focus ring / tap highlight on Leaflet SVG paths ── */
+/* Fixes the blue/white box that appears when click-and-holding a country */
+.leaflet-interactive:focus,
+.leaflet-interactive:focus-visible {
+  outline: none !important;
+}
+path.leaflet-interactive {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.leaflet-container svg:focus,
+.leaflet-container svg *:focus {
+  outline: none !important;
+}
+
+/* ── Marching-ants border animation for hovered country ──
+   Runs on the GeoJSON feature's own <path> element — no separate polygon.
+   Accuracy = whatever the source GeoJSON resolution is. */
+@keyframes ow-march {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -24; }
+}
+path.leaflet-interactive.ow-country-hover {
+  stroke-dasharray: 8 4;
+  animation: ow-march 1s linear infinite;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #07090b; }
