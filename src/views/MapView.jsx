@@ -78,14 +78,16 @@ function normalizeAircraft(raw) {
 }
 
 // ── ESC_GEO — Option C: invisible, border glow on hover ──────
+// ESC_GEO: used only for tooltip label colour, not map fill
+// Hover uses white glow only — avoids colour distortion on dark tiles
 const ESC_GEO = {
-  CRITICAL:{ fill:'#e85040', stroke:'#e85040' },
-  SURGE:   { fill:'#e85040', stroke:'#e85040' },
-  HIGH:    { fill:'#f0a040', stroke:'#f0a040' },
-  ELEVATED:{ fill:'#e8d040', stroke:'#e8d040' },
-  ACTIVE:  { fill:'#50a0e8', stroke:'#50a0e8' },
-  MODERATE:{ fill:'#50a0e8', stroke:'#50a0e8' },
-  WATCH:   { fill:'#4a6070', stroke:'#4a6070' },
+  CRITICAL:{ color:'#e85040' },
+  SURGE:   { color:'#e85040' },
+  HIGH:    { color:'#f0a040' },
+  ELEVATED:{ color:'#e8d040' },
+  ACTIVE:  { color:'#50a0e8' },
+  MODERATE:{ color:'#50a0e8' },
+  WATCH:   { color:'#4a6070' },
 }
 
 function mkIcon(sym, color, size=18, badge=null) {
@@ -525,12 +527,12 @@ export function MapView({ auth }) {
 
       {/* MAP */}
       <div style={{position:'relative',overflow:'hidden'}}>
-        <style>{`.ow-country-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #2e3f52!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:0 6px 18px rgba(0,0,0,0.55)!important}.ow-tip::before{display:none!important}.ow-ab-tip{padding:9px 12px 10px!important;border-left:2px solid currentColor}`}</style>
-        <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
+        <style>{`.ow-country-tip{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}.ow-tip{background:rgba(7,9,11,.95)!important;border:1px solid #2e3f52!important;border-radius:2px!important;padding:4px 8px!important;box-shadow:0 6px 18px rgba(0,0,0,0.55)!important}.ow-tip::before{display:none!important}.ow-ab-popup .leaflet-popup-content-wrapper{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;border-radius:2px!important}.ow-ab-popup .leaflet-popup-content{margin:0!important;line-height:1!important}.ow-ab-popup .leaflet-popup-tip-container{display:none!important}`}</style>
+        <MapContainer center={[28,22]} zoom={3} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false} boxZoom={false}>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
           {countryGeo&&countryIntel.length>0&&<GeoJSON key={geoKey.current} data={countryGeo} style={geoStyle} onEachFeature={onEachFeature} />}
           <FlyTo target={flyTarget} />
-          <MapClickHandler repositioning={!!repositionAsset} onClear={()=>{setSelAsset(null);setSelCor(null)}} onReposition={(pos)=>setRepositionPos(pos)} />
+          <MapClickHandler repositioning={!!repositionAsset} onClear={()=>{setSelAsset(null);setSelCor(null);setAbmAsset(null)}} onReposition={(pos)=>setRepositionPos(pos)} />
 
           {repositionAsset&&repositionPos&&(
             <Marker position={[repositionPos.lat,repositionPos.lng]} draggable={true}
@@ -541,31 +543,73 @@ export function MapView({ auth }) {
           {selCor&&(()=>{const f=ICAO_COORDS[selCor.from],t=ICAO_COORDS[selCor.to];if(!f||!t)return null;return<Polyline positions={[f,t]} pathOptions={{color:C.a,weight:2.5,dashArray:'8 4',opacity:.85}} />})()}
 
            {layers.airbases&&allAssets.filter(a=>a.type==='airbase'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
-            const statusLabel = {SURGE:'SURGE',ELEVATED:'ELEVATED',ACTIVE:'NOMINAL',MODERATE:'NOMINAL'}[a.status]||'DORMANT'
             const col = {SURGE:C.r,ELEVATED:C.a,ACTIVE:C.g,MODERATE:C.b}[a.status]||C.t2
+            const statusLabel = {SURGE:'SURGE',ELEVATED:'ELEVATED',ACTIVE:'NOMINAL',MODERATE:'NOMINAL'}[a.status]||'DORMANT'
+            const icao = (a.icao||a.id||'').toUpperCase()
+            const region = a.sub?.split('//')[1]?.split('—')[0]?.trim()||''
+            // 7-day arrivals from flights array
+            const sevenDaysAgo = new Date(Date.now()-7*864e5)
+            const arrivals7d = flights.filter(f=>
+              f.destination?.toUpperCase()===icao &&
+              f.dep_date && new Date(f.dep_date)>=sevenDaysAgo
+            ).length
+            const depCount = flights.filter(f=>f.base?.toUpperCase()===icao).length
             return (
               <Marker key={a.id} position={[a.lat,a.lng]}
-                icon={mkAirbaseIcon(a.status, a.socomCnt||0)}
+                icon={mkAirbaseIcon(a.status, arrivals7d||a.arrCnt||0)}
                 eventHandlers={{click:()=>selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip ow-ab-tip">
-                  <div style={{minWidth:180,whiteSpace:'nowrap'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:3}}>
-                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:2,color:col}}>{a.icao||a.id?.toUpperCase()}</span>
-                      <span style={{marginLeft:'auto',fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,padding:'2px 6px',color:col,border:`1px solid ${col}`,opacity:0.85}}>{statusLabel}</span>
-                    </div>
-                    <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:600,color:'#dceaf0',marginBottom:a.arrCnt||a.socomCnt>0?7:0}}>
-                      {a.name}
-                    </div>
-                    {a.arrCnt>0&&<div style={{display:'flex',justifyContent:'space-between',gap:20,lineHeight:1.75}}>
-                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1.5,color:'#4a6070'}}>ARRIVALS</span>
-                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:500,color:'#dceaf0'}}>{a.arrCnt} tracked</span>
-                    </div>}
-                    {a.socomCnt>0&&<div style={{display:'flex',justifyContent:'space-between',gap:20,lineHeight:1.75}}>
-                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1.5,color:'#4a6070'}}>SOCOM</span>
-                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:500,color:'#a060e8'}}>{a.socomCnt}</span>
-                    </div>}
-                  </div>
+                {/* Hover tooltip — minimal */}
+                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip" permanent={false}>
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,letterSpacing:1,color:col}}>
+                    {icao}
+                  </span>
+                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:8}}>
+                    {a.name}
+                  </span>
                 </Tooltip>
+                {/* Click popup — full card matching image-1 design */}
+                <Popup closeButton={false} className="ow-ab-popup" maxWidth={300} minWidth={280}>
+                  <div style={{width:280,background:'#07090b',fontFamily:"'Share Tech Mono',monospace",borderLeft:`2px solid ${col}`}}>
+                    {/* Row 1: ICAO + region + status */}
+                    <div style={{padding:'10px 12px 6px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:11,fontWeight:700,color:col,letterSpacing:2}}>{icao}</span>
+                          {region&&<span style={{fontSize:9,color:'#4a6070',letterSpacing:1}}>{region.toUpperCase()}</span>}
+                        </div>
+                        <span style={{fontSize:8,color:col,border:`1px solid ${col}`,padding:'2px 7px',letterSpacing:2}}>{statusLabel}</span>
+                      </div>
+                      {/* Airbase name */}
+                      <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:19,fontWeight:700,color:'#dceaf0',letterSpacing:0.5,lineHeight:1.2}}>
+                        {a.name}
+                      </div>
+                    </div>
+                    {/* Row 2: ARR / DEP / 7D stats */}
+                    <div style={{padding:'7px 12px 8px',display:'flex',alignItems:'baseline',gap:8,borderTop:'1px solid #1e2c3a',borderBottom:'1px solid #1e2c3a'}}>
+                      <span style={{fontSize:8,color:'#4a6070',letterSpacing:1}}>ARR</span>
+                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:col,minWidth:20}}>{a.arrCnt||0}</span>
+                      <span style={{fontSize:8,color:'#4a6070',letterSpacing:1,marginLeft:6}}>DEP</span>
+                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:'#dceaf0',minWidth:20}}>{depCount}</span>
+                      <span style={{fontSize:8,color:'#4a6070',letterSpacing:1,marginLeft:6}}>7D</span>
+                      <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:'#f0a040',minWidth:24}}>{arrivals7d||a.arrCnt||0}</span>
+                    </div>
+                    {/* Row 3: Action buttons */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
+                      <div onClick={()=>{ window.location.href=`/airbase/${icao}` }}
+                        style={{padding:'9px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:6,
+                          fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:col,
+                          borderRight:'1px solid #1e2c3a',userSelect:'none'}}>
+                        <span>→</span><span>AIRBASE VIEW</span>
+                      </div>
+                      <div onClick={()=>{selectAsset(a);setAbmAsset(a)}}
+                        style={{padding:'9px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:6,
+                          fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:C.a,
+                          justifyContent:'center',userSelect:'none'}}>
+                        <span>▼</span><span>EXPAND</span>
+                      </div>
+                    </div>
+                  </div>
+                </Popup>
               </Marker>
             )
           })}
@@ -667,7 +711,7 @@ export function MapView({ auth }) {
         )}
 
         <div style={{position:'absolute',top:0,left:0,right:0,zIndex:800,background:'rgba(7,9,11,.88)',borderBottom:`1px solid ${C.br}`,display:'flex',backdropFilter:'blur(6px)'}}>
-          {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'SOCOM',v:socomCnt,c:C.p},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.g}].map(({l,v,c})=>(
+          {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'AOR BASES',v:bases,c:C.g},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.a}].map(({l,v,c})=>(
             <div key={l} style={{padding:'5px 14px',borderRight:`1px solid ${C.br}`}}>
               <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:1}}>{l}</div>
               <div style={{...R,fontSize:16,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
@@ -881,11 +925,18 @@ function ADetail({asset,onExpand,flights,navigate,auth,onReposition}) {
       </div>
       <div style={{padding:'8px 13px',borderBottom:`1px solid ${C.br}`}}>
         {asset.type==='airbase'?(
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
-            <SBox value={asset.arrCnt||0} label="ARRIVALS" color={C.a} />
-            <SBox value="tracked" label="DEPARTURES" color={C.b} />
-            <SBox value={asset.socomCnt||0} label="SOCOM" color={C.p} />
-          </div>
+          (() => {
+            const icaoKey = (asset.icao||asset.id||'').toUpperCase()
+            const outCnt = flights.filter(f=>f.base?.toUpperCase()===icaoKey).length
+            const last7d = flights.filter(f=>f.destination?.toUpperCase()===icaoKey&&f.dep_date&&new Date(f.dep_date)>=new Date(Date.now()-7*864e5)).length
+            return (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+                <SBox value={asset.arrCnt||0} label="ARRIVALS" color={C.a} />
+                <SBox value={outCnt} label="DEPARTURES" color={C.b} />
+                <SBox value={last7d||asset.arrCnt||0} label="LAST 7D" color={C.g} />
+              </div>
+            )
+          })()
         ):(
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
             <SBox value={asset.status} label="STATUS" color={stCol} />

@@ -48,8 +48,7 @@ function TierGate({required,current,children}) {
   if((TO[current]||0)>=(TO[required]||0)) return children
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:40,gap:10,textAlign:'center'}}>
-      <div style={{fontSize:28,opacity:.3}}>🔒</div>
-      <div style={{...R,fontSize:13,fontWeight:700,color:C.t2,letterSpacing:2}}>{required.toUpperCase()} TIER</div>
+      <div style={{...R,fontSize:13,fontWeight:700,color:C.t2,letterSpacing:2}}>{required.toUpperCase()} TIER REQUIRED</div>
       <div style={{...Z,fontSize:9,color:C.t3}}>Upgrade to access this intelligence layer</div>
     </div>
   )
@@ -119,12 +118,12 @@ export function AirbaseView({auth}) {
       <div style={{background:C.bg4,borderBottom:`1px solid ${C.br}`,padding:'0 20px',flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:16,height:52}}>
           <button onClick={()=>navigate(-1)} style={{...Z,fontSize:10,color:C.t2,background:'transparent',border:`1px solid ${C.br}`,padding:'4px 12px',cursor:'pointer',letterSpacing:2}}>← BACK</button>
-          <span style={{fontSize:18}}>✈</span>
+          
           <div style={{...R,fontSize:20,fontWeight:700,color:C.tb}}>{asset.name}</div>
           <div style={{...Z,fontSize:10,color:C.t2}}>{asset.sub}</div>
           <div style={{...Z,fontSize:11,fontWeight:700,padding:'3px 12px',borderRadius:1,color:stCol,background:`${stCol}22`,border:`1px solid ${stCol}44`,letterSpacing:2}}>{asset.status}</div>
           <div style={{marginLeft:'auto',display:'flex',gap:16}}>
-            {[{v:inbound.length,l:'INBOUND',c:C.a},{v:outbound.length,l:'OUTBOUND',c:C.b},{v:socom,l:'SOCOM',c:C.p}].map(({v,l,c})=>(
+            {[{v:inbound.length,l:'INBOUND',c:C.a},{v:outbound.length,l:'OUTBOUND',c:C.b},{v:inbound.length+outbound.length,l:'TOTAL OPS',c:C.b}].map(({v,l,c})=>(
               <div key={l} style={{textAlign:'center'}}>
                 <div style={{...R,fontSize:18,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
                 <div style={{...Z,fontSize:8,color:C.t3,letterSpacing:1}}>{l}</div>
@@ -167,10 +166,10 @@ function AirbaseOverview({asset,inbound,outbound,socom,auth}) {
           {[
             {v:inbound.length,l:'INBOUND',c:C.a},
             {v:outbound.length,l:'OUTBOUND',c:C.b},
-            {v:socom,l:'SOCOM',c:C.p},
-            {v:inbound.filter(f=>new Date(f.dep_date)>=new Date(Date.now()-7*864e5)).length,l:'LAST 7D',c:C.g},
-            {v:asset.aircraftTypes?.length||0,l:'AC TYPES',c:C.y},
+            {v:inbound.filter(f=>f.dep_date&&new Date(f.dep_date)>=new Date(Date.now()-7*864e5)).length,l:'LAST 7D',c:C.g},
             {v:inbound.length+outbound.length,l:'TOTAL OPS',c:C.b},
+            {v:asset.aircraftTypes?.filter(a=>!['Strategic Airlift'].includes(a.role)).length||0,l:'AC TYPES',c:C.y},
+            {v:socom,l:'SOCOM',c:C.p},
           ].map(({v,l,c})=>(
             <div key={l} style={{padding:'10px 12px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
               <div style={{...R,fontSize:20,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
@@ -207,9 +206,9 @@ function AirbaseOverview({asset,inbound,outbound,socom,auth}) {
         {asset.lat&&asset.lng&&(
           <div style={{flex:1,minHeight:300}}>
             <MapContainer center={[asset.lat,asset.lng]} zoom={10} style={{width:'100%',height:'100%'}} zoomControl={false} attributionControl={false}>
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={18} />
+              <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
               <Marker position={[asset.lat,asset.lng]}
-                icon={L.divIcon({html:`<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.9);border:2px solid ${stCol};border-radius:2px;font-size:14px;box-shadow:0 0 16px ${stCol}88">✈</div>`,className:'',iconSize:[28,28],iconAnchor:[14,14]})} />
+                icon={L.divIcon({html:`<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.9);border:2px solid ${stCol};border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:9px;font-weight:700;color:#dceaf0;box-shadow:0 0 16px ${stCol}88">AB</div>`,className:'',iconSize:[28,28],iconAnchor:[14,14]})} />
             </MapContainer>
           </div>
         )}
@@ -343,7 +342,7 @@ function AirfieldMapTab({asset,auth}) {
         <span>AIRFIELD MAP</span>
         {/* Tile toggle */}
         <div style={{display:'flex',gap:0,marginLeft:8}}>
-          {[['satellite','🛰 SAT'],['street','🗺 STREET']].map(([mode,label])=>(
+          {[['satellite','SAT'],['street','STREET']].map(([mode,label])=>(
             <button key={mode} onClick={()=>setMapMode(mode)}
               style={{...Z,fontSize:9,padding:'3px 10px',background:mapMode===mode?C.b:'transparent',
                 border:`1px solid ${mapMode===mode?C.b:C.br}`,color:mapMode===mode?C.bg:C.t2,cursor:'pointer',letterSpacing:1}}>
@@ -528,7 +527,7 @@ function DetailPanel({img, auth, onDelete, onSaved}) {
             </button>
             <button onClick={()=>onDelete(img)}
               style={{...Z,fontSize:9,color:C.r,background:'transparent',border:`1px solid ${C.r}44`,padding:'4px 8px',cursor:'pointer',borderRadius:1}}>
-              🗑 DELETE
+              DELETE
             </button>
           </>
         )}
@@ -667,7 +666,7 @@ function ImageryTab({images:initImages,code,auth}) {
                   <img src={form.preview} alt="preview" style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'}} />
                 ) : (
                   <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6}}>
-                    <span style={{fontSize:24,opacity:.3}}>🛰</span>
+                    
                     <span style={{...Z,fontSize:8,color:C.t3}}>Click to select</span>
                   </div>
                 )}
@@ -729,7 +728,7 @@ function ImageryTab({images:initImages,code,auth}) {
         <TierGate required="analyst" current={auth?.tier||'free'}>
           {images.length===0&&!showForm?(
             <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12}}>
-              <span style={{fontSize:32,opacity:.2}}>🛰</span>
+              
               <div style={{...Z,fontSize:10,color:C.t3}}>No imagery catalogued for {code}</div>
               {auth?.isAdmin&&<button onClick={()=>setShowForm(true)} style={{...Z,fontSize:9,color:C.g,background:'transparent',border:`1px solid ${C.g}44`,padding:'5px 14px',cursor:'pointer',borderRadius:1}}>+ UPLOAD FIRST IMAGE</button>}
             </div>
