@@ -566,7 +566,7 @@ export function MapView({ auth }) {
             const col=a.status==='REFIT'?C.t3:a.status==='SURGE'?C.r:C.b
             // Extract hull designation: prefer explicit hull, fall back to sub prefix
             const rawHull = a.hull || a.sub?.split('//')[0]?.trim() || a.id?.toUpperCase() || ''
-            const hull = const hull = rawHull.replace(/^(USS|HMS) /i,'').slice(0,8).trim() || 'CVG'
+            const hull = rawHull.replace(/^(USS|HMS) /i,'').slice(0,8).trim() || 'CVG'
             return (
               <Marker key={a.id} position={[a.lat,a.lng]}
                 icon={mkTrackBlock(hull, col, a.status==='DEPLOYED'||a.status==='SURGE')}
