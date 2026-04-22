@@ -13,6 +13,7 @@ import { AssetEditor }    from './admin/AssetEditor'
 import { CoronetEditor }  from './admin/CoronetEditor'
 import { CountryEditor }  from './admin/CountryEditor'
 import { UserManager }    from './admin/UserManager'
+import { OsintIngest }    from './admin/OsintIngest'
 import { LoginPage }      from './components/LoginPage'
 
 export default function App() {
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="coronets"     element={<CoronetEditor />} />
             <Route path="countries"    element={<CountryEditor />} />
             <Route path="users"        element={<UserManager auth={auth} />} />
+              <Route path="ingest" element={<OsintIngest />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

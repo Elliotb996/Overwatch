@@ -167,20 +167,20 @@ const STATIC_ASSETS = [
   {id:'egva',name:'RAF Fairford',sub:'EGVA // UK — USAF BOMBER HUB',country:'US',type:'airbase',status:'SURGE',lat:51.682,lng:-1.790,arrCnt:0,socomCnt:0,
    aircraftTypes:[
      {type:'B-52H Stratofortress', unit:'5 BW / 2 BW',   qty:'8',  role:'Strategic Bomber',
-      tails:['61-0001 (FLIP 61)','61-0035 (FLIP 62)','60-0012 (FLIP 63)','60-0007 (HOOKY 23)','60-0060 (HOOKY 22)','60-0023 (HOOKY 21)']},
+      tails:['61-0001','61-0035','60-0012','60-0007','60-0060','60-0023']},
      {type:'B-1B Lancer',         unit:'7 BW / 28 BW',  qty:'18+', role:'Strategic Bomber',
-      tails:['86-0129 (TWIN 44)','86-0102 (TWIN 43)','85-0072 (TWIN 42)','86-0138 (TWIN 41)','86-0107 (MOLT 13)','85-0088 (MOLT 12)','85-0064 (MOLT 11)','86-0140 (MOLT 14)','86-0139 (PIKE 74)','86-0108 (PIKE 73)','86-0121 (PIKE 72)','85-0060 (PURSE 33)','86-0134 (PURSE 34)','85-0069 (PURSE 35)']},
+      tails:['86-0129','86-0102','85-0072','86-0138','86-0107','85-0088','85-0064','86-0140','86-0139','86-0108','86-0121','85-0060','86-0134','85-0069']},
    ],
    intel:'CONFIRMED: 8x B-52H + 18+ B-1B as of 28 Mar 2026. Largest US forward bomber deployment since Gulf War.',tags:['SURGE','B-52H','B-1B','OP-EPIC-FURY']},
 
   {id:'egun',name:'RAF Mildenhall',sub:'EGUN // UK — SOCOM/AFSOC HUB',country:'US',type:'airbase',status:'SURGE',lat:52.362,lng:0.486,arrCnt:41,socomCnt:41,
    aircraftTypes:[
      {type:'MC-130J Commando II',  unit:'352nd SOG / 1st SOW', qty:'41+', role:'SOCOM Assault/Infiltration',
-      tails:['14-5805 (UNLIT 77)','BLATE 83-99 series','AGREE 08/33/35 series','PILUM 41-55 series','SWASH 03-09 series']},
+      tails:['14-5805']},
      {type:'AC-130J Ghostrider',   unit:'1st SOW / AFSOC',     qty:'3',   role:'Gunship',
       tails:['HEEL 51','HEEL 53','HEEL 55']},
      {type:'EA-37B Compass Call',  unit:'55th Wing / ACC',     qty:'2',   role:'EW', status:'DEPARTED',
-      tails:['AE17CD 19-1587 (AXIS 41)','AE142E 17-5579 (AXIS 43)']},
+      tails:['AE17CD 19-1587','AE142E 17-5579']},
    ],
    intel:'41+ MC-130J staged since 3 Mar. 11x Silent Knight mod confirmed.',tags:['SURGE','MC-130J','AFSOC','OP-EPIC-FURY']},
 
@@ -196,7 +196,7 @@ const STATIC_ASSETS = [
   {id:'lgsa',name:'Souda Bay / Chania',sub:'LGSA // Crete, Greece',country:'US',type:'airbase',status:'ACTIVE',lat:35.531,lng:24.147,arrCnt:4,socomCnt:0,
    aircraftTypes:[
      {type:'EA-37B Compass Call', unit:'55th Wing / ACC', qty:'2', role:'EW',
-      tails:['19-1587 (AXIS 41)','17-5579 (AXIS 43)']},
+      tails:['19-1587','17-5579']},
    ],
    intel:'EA-37B AXIS 41/43 arrived from Mildenhall 2 Apr. EW forward hub Eastern Med.',tags:['CRETE','NATO','EW']},
 
@@ -670,7 +670,8 @@ function AListItem({asset,sel,onClick}) {
 // All data passes through normalizeAircraft() first.
 // DEPARTED aircraft are filtered out — they are history, not current picture.
 function AircraftOnStation({ types }) {
-  const [openIdx, setOpenIdx] = useState(null)
+  const [openSet, setOpenSet] = useState(new Set())
+  function toggleOpen(i) { setOpenSet(prev => { const s=new Set(prev); s.has(i)?s.delete(i):s.add(i); return s }) }
   if (!types?.length) return null
 
   const active = types.map(normalizeAircraft).filter(ac => ac && !ac.isLogistics && ac.status !== 'DEPARTED')
@@ -681,10 +682,10 @@ function AircraftOnStation({ types }) {
       <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:8}}>AIRCRAFT ON STATION</div>
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         {active.map((ac,i) => {
-          const isOpen = openIdx === i
+          const isOpen = openSet.has(i)
           return (
             <div key={i}>
-              <div onClick={()=>setOpenIdx(isOpen?null:i)}
+              <div onClick={()=>toggleOpen(i)}
                 style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',
                   background:isOpen?'rgba(80,160,232,.06)':C.bg3,
                   border:`1px solid ${isOpen?C.b:C.br}`,borderRadius:1,
@@ -939,7 +940,8 @@ function AbmModal({asset,flights,onClose,navigate}) {
 // Expanded modal AIRCRAFT tab: type + count + unit
 // Same normalizeAircraft pipeline — API-feed ready
 function ModalAircraftTab({ types, squadrons, csg }) {
-  const [openIdx, setOpenIdx] = useState(null)
+  const [openSet, setOpenSet] = useState(new Set())
+  function toggleOpen(i) { setOpenSet(prev => { const s=new Set(prev); s.has(i)?s.delete(i):s.add(i); return s }) }
 
   const hasAircraft = types?.length || squadrons?.length
 
@@ -973,11 +975,11 @@ function ModalAircraftTab({ types, squadrons, csg }) {
       <div style={{...R,fontSize:9,fontWeight:600,letterSpacing:3,color:C.t2,marginBottom:10}}>AIRCRAFT ON STATION</div>
       <div style={{display:'flex',flexDirection:'column',gap:4}}>
         {normalised.map((ac,i)=>{
-          const isOpen = openIdx===i
+          const isOpen = openSet.has(i)
           const statusCol = ac.status==='DEPARTED'?C.t3:ac.status==='SURGE'?C.r:ac.status==='ASSESSED'?C.t2:C.tb
           return (
             <div key={i}>
-              <div onClick={()=>setOpenIdx(isOpen?null:i)}
+              <div onClick={()=>toggleOpen(i)}
                 style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
                   background:isOpen?'rgba(80,160,232,.06)':C.bg3,
                   border:`1px solid ${isOpen?C.b:C.br}`,borderRadius:1,
