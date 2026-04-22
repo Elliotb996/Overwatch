@@ -41,7 +41,7 @@ function mkBaseIcon(emoji, color, label='') {
 }
 
 function TierGate({required,current,children}) {
-  const TO={free:0,analyst:1,premium:2,admin:3}
+  const TO={free:0,analyst:1,premium:2,admin:3,owner:4}
   if((TO[current]||0)>=(TO[required]||0)) return children
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,gap:10,background:'rgba(7,9,11,.5)',border:`1px solid ${C.br}`,borderRadius:2,textAlign:'center',margin:16}}>

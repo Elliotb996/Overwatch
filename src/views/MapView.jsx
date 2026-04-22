@@ -98,6 +98,39 @@ function mkIcon(sym, color, size=26, pulse=false, badge=null) {
   })
 }
 
+// ── Military track block marker ──────────────────────────────
+// Hull designation in Share Tech Mono inside bordered box.
+// Mirrors NATO standard symbology style: small rectangle with unit ID.
+// pulse=true adds animation ring for deployed/surge status.
+function mkTrackBlock(label, color, pulse=false) {
+  const w = Math.max(44, label.length * 7 + 16)
+  const ring = pulse
+    ? `<div style="position:absolute;inset:-4px;border:1px solid ${color};opacity:.4;animation:rp 2.2s infinite;pointer-events:none"></div>`
+    : ''
+  return L.divIcon({
+    html: `<div style="position:relative">
+      ${ring}
+      <div style="
+        min-width:${w}px;height:20px;
+        display:flex;align-items:center;justify-content:center;
+        background:rgba(7,9,11,.92);
+        border:1.5px solid ${color};
+        font-family:'Share Tech Mono',monospace;
+        font-size:10px;font-weight:700;
+        color:#dceaf0;
+        letter-spacing:1px;
+        padding:0 6px;
+        box-shadow:0 0 8px ${color}44;
+        white-space:nowrap;
+      ">${label}</div>
+    </div>
+    <style>@keyframes rp{0%{transform:scale(.85);opacity:.5}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}</style>`,
+    className: '',
+    iconSize: [w, 20],
+    iconAnchor: [w/2, 10],
+  })
+}
+
 const VIEWS = {
   WORLD:{center:[28,22],zoom:3}, MED:{center:[37,22],zoom:5},
   GULF:{center:[26,52],zoom:5}, ATLANTIC:{center:[44,-30],zoom:4}, INDOPACOM:{center:[20,120],zoom:4},
@@ -510,19 +543,58 @@ export function MapView({ auth }) {
             )
           })}
 
-          {layers.carriers&&allAssets.filter(a=>a.type==='carrier'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>(
-            <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('●',a.status==='REFIT'?C.t3:C.b,28,a.status==='DEPLOYED')} eventHandlers={{click:()=>selectAsset(a)}} />
-          ))}
-          {layers.destroyers&&allAssets.filter(a=>a.type==='destroyer'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>(
-            <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('●',C.b,22)} eventHandlers={{click:()=>selectAsset(a)}} />
-          ))}
-          {layers.subs&&allAssets.filter(a=>a.type==='submarine'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>(
-            <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('●',C.p,22)} eventHandlers={{click:()=>selectAsset(a)}} />
-          ))}
+          {layers.carriers&&allAssets.filter(a=>a.type==='carrier'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
+            const col=a.status==='REFIT'?C.t3:a.status==='SURGE'?C.r:C.b
+            const hull=(a.csg||a.hull||a.sub?.split('//')[0]?.trim()||a.id?.toUpperCase()||'').replace('CVN-','CVN').replace('R0','R')
+            return (
+              <Marker key={a.id} position={[a.lat,a.lng]}
+                icon={mkTrackBlock(hull, col, a.status==='DEPLOYED'||a.status==='SURGE')}
+                eventHandlers={{click:()=>selectAsset(a)}}>
+                <Popup closeButton={false}>
+                  <div style={{...Z,fontSize:11,minWidth:140}}>
+                    <div style={{...R,fontSize:13,fontWeight:700,color:C.tb,marginBottom:2}}>{a.name}</div>
+                    <div style={{...Z,fontSize:9,color:C.t2}}>{a.sub}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
+          {layers.destroyers&&allAssets.filter(a=>a.type==='destroyer'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
+            const hull=(a.hull||a.sub?.split('//')[0]?.trim()||'').replace('DDG-','DDG').replace('D3','D')
+            return (
+              <Marker key={a.id} position={[a.lat,a.lng]}
+                icon={mkTrackBlock(hull, C.b, false)}
+                eventHandlers={{click:()=>selectAsset(a)}}>
+                <Popup closeButton={false}>
+                  <div style={{...Z,fontSize:11,minWidth:120}}>
+                    <div style={{...R,fontSize:13,fontWeight:700,color:C.tb,marginBottom:2}}>{a.name}</div>
+                    <div style={{...Z,fontSize:9,color:C.t2}}>{a.sub}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
+          {layers.subs&&allAssets.filter(a=>a.type==='submarine'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
+            const hull=(a.hull||a.sub?.split('//')[0]?.trim()||'').replace('SSN-','SSN').replace('S1','S')
+            return (
+              <Marker key={a.id} position={[a.lat,a.lng]}
+                icon={mkTrackBlock(hull, C.p, false)}
+                eventHandlers={{click:()=>selectAsset(a)}}>
+                <Popup closeButton={false}>
+                  <div style={{...Z,fontSize:11,minWidth:120}}>
+                    <div style={{...R,fontSize:13,fontWeight:700,color:C.tb,marginBottom:2}}>{a.name}</div>
+                    <div style={{...Z,fontSize:9,color:C.t2}}>{a.sub}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
           {layers.lmsr&&LMSR_DATA.filter(s=>s.lat!=null&&s.lng!=null&&repositionAsset?.id!==s.id).map(s=>{
             const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
             return (
-              <Marker key={s.id} position={[s.lat,s.lng]} icon={mkIcon('▲',col,22,s.cat==='forward')} eventHandlers={{click:()=>selectAsset({...s,type:'lmsr'})}}>
+              <Marker key={s.id} position={[s.lat,s.lng]}
+                icon={mkTrackBlock(s.hull||s.id?.toUpperCase()||'LMSR', col, s.cat==='forward')}
+                eventHandlers={{click:()=>selectAsset({...s,type:'lmsr'})}}>
                 <Popup closeButton={false}>
                   <div style={{...Z,fontSize:11}}>
                     <div style={{...R,fontSize:13,fontWeight:700,color:C.tb}}>{s.name}</div>

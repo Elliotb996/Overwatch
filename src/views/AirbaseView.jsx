@@ -36,9 +36,9 @@ const STATIC_ASSETS=[
   {id:'lgel',icao:'LGEL',name:'Elefsis AB',sub:'LGEL // Greece',status:'ELEVATED',lat:38.065,lng:23.556,arrCnt:5,socomCnt:3,intel:'Emerged late March. SAAM dominant.',aircraftTypes:[{type:'C-17A Globemaster III',qty:'5',role:'Strategic Airlift'}],tags:['GREECE','NATO']},
   {id:'lgsa',icao:'LGSA',name:'Souda Bay / Chania',sub:'LGSA // Crete',status:'ACTIVE',lat:35.531,lng:24.147,arrCnt:4,socomCnt:0,intel:'EA-37B AXIS 41/43 arrived from Mildenhall. EW forward hub.',aircraftTypes:[{type:'EA-37B Compass Call',qty:'2x (AXIS 41/43)',role:'EW'}],tags:['CRETE','EW']},
   {id:'etar',icao:'ETAR',name:'Ramstein AB',sub:'ETAR // Germany',status:'ACTIVE',lat:49.437,lng:7.600,arrCnt:5,socomCnt:0,intel:'Universal CONUS→CENTCOM gateway. Every tracked mission transits.',aircraftTypes:[{type:'C-17A Globemaster III',qty:'rotational',role:'Strategic Airlift'},{type:'KC-135R',qty:'2x det',role:'Tanker'}],tags:['EUCOM','GATEWAY']},
-  {id:'egva',icao:'EGVA',name:'RAF Fairford',sub:'EGVA // UK — USAF BOMBER HUB',status:'SURGE',lat:51.682,lng:-1.790,arrCnt:0,socomCnt:0,intel:'8x B-52H + 18+ B-1B. Largest US forward bomber deployment since Gulf War.',aircraftTypes:[{type:'B-52H Stratofortress',qty:'8x',role:'Strategic Bomber',tails:['61-0001(FLIP 61)','61-0035(FLIP 62)','60-0012(FLIP 63)','60-0007(HOOKY 23)','60-0060(HOOKY 22)','60-0023(HOOKY 21)']},{type:'B-1B Lancer',qty:'18x+',role:'Strategic Bomber',tails:['86-0102(TWIN 43)','86-0129(TWIN 44)','85-0072(TWIN 42)','86-0138(TWIN 41)','86-0107(MOLT 13)','85-0064(MOLT 11)','86-0140(MOLT 14)']}],tags:['SURGE','B-52H','B-1B','OP-EPIC-FURY']},
-  {id:'egun',icao:'EGUN',name:'RAF Mildenhall',sub:'EGUN // UK — SOCOM HUB',status:'SURGE',lat:52.362,lng:0.486,arrCnt:41,socomCnt:41,intel:'41+ MC-130J staged since 3 Mar. 11x Silent Knight. AC-130 Gunship det.',aircraftTypes:[{type:'MC-130J Commando II',qty:'41+ (11x Silent Knight)',role:'SOCOM Assault/Infiltration',tails:['14-5805(UNLIT 77)','BLATE 83-99 x9']},{type:'AC-130 Gunship',qty:'3x',role:'Gunship',tails:['HEEL 51','HEEL 53','HEEL 55']},{type:'EA-37B Compass Call',qty:'2x (departed)',role:'EW'}],tags:['SURGE','MC-130J','AFSOC']},
-  {id:'egul',icao:'EGUL',name:'RAF Lakenheath',sub:'EGUL // UK — USAFE HUB',status:'ELEVATED',lat:52.409,lng:0.560,arrCnt:0,socomCnt:0,intel:'F-22A CORONET EAST 051, A-10C CORONET EAST 062/032 complete. AC-130 det.',aircraftTypes:[{type:'F-22A Raptor',qty:'6x (CORONET 051)',role:'Fighter',tails:['CORONET EAST 051 — 1st FW Langley']},{type:'A-10C Thunderbolt II',qty:'12x (CORONET 062/032)',role:'Strike',tails:['190th/107th FS Boise ANGB']},{type:'AC-130',qty:'3x',role:'Gunship',tails:['HEEL 51','HEEL 53','HEEL 55']},{type:'F-15E Strike Eagle',qty:'48th FW organic',role:'Strike'}],tags:['SURGE','CORONET','USAFE']},
+  {id:'egva',icao:'EGVA',name:'RAF Fairford',sub:'EGVA // UK — USAF BOMBER HUB',status:'SURGE',lat:51.682,lng:-1.790,arrCnt:0,socomCnt:0,intel:'8x B-52H + 18+ B-1B. Largest US forward bomber deployment since Gulf War.',aircraftTypes:[{type:'B-52H Stratofortress',qty:'8x',role:'Strategic Bomber',tails:['61-0001','61-0035','60-0012','60-0007','60-0060','60-0023']},{type:'B-1B Lancer',qty:'18x+',role:'Strategic Bomber',tails:['86-0102','86-0129','85-0072','86-0138','86-0107','85-0064','86-0140']}],tags:['SURGE','B-52H','B-1B','OP-EPIC-FURY']},
+  {id:'egun',icao:'EGUN',name:'RAF Mildenhall',sub:'EGUN // UK — SOCOM HUB',status:'SURGE',lat:52.362,lng:0.486,arrCnt:41,socomCnt:41,intel:'41+ MC-130J staged since 3 Mar. 11x Silent Knight. AC-130 Gunship det.',aircraftTypes:[{type:'MC-130J Commando II',qty:'41+ (11x Silent Knight)',role:'SOCOM Assault/Infiltration',tails:['14-5805']},{type:'AC-130 Gunship',qty:'3x',role:'Gunship',tails:[]},{type:'EA-37B Compass Call',qty:'2x (departed)',role:'EW'}],tags:['SURGE','MC-130J','AFSOC']},
+  {id:'egul',icao:'EGUL',name:'RAF Lakenheath',sub:'EGUL // UK — USAFE HUB',status:'ELEVATED',lat:52.409,lng:0.560,arrCnt:0,socomCnt:0,intel:'F-22A CORONET EAST 051, A-10C CORONET EAST 062/032 complete. AC-130 det.',aircraftTypes:[{type:'F-22A Raptor',qty:'6x (CORONET 051)',role:'Fighter',tails:[]},{type:'A-10C Thunderbolt II',qty:'12x (CORONET 062/032)',role:'Strike',tails:[]},{type:'AC-130',qty:'3x',role:'Gunship',tails:[]},{type:'F-15E Strike Eagle',qty:'48th FW organic',role:'Strike'}],tags:['SURGE','CORONET','USAFE']},
   {id:'fjdg',icao:'FJDG',name:'Diego Garcia NSF',sub:'FJDG // BIOT',status:'ACTIVE',lat:-7.3132,lng:72.4108,arrCnt:0,socomCnt:0,intel:'Major pre-positioning hub. FJDG→OJMS/OEPS direct routing.',aircraftTypes:[{type:'B-52H / B-1B',qty:'surge capable',role:'Strategic Bomber'},{type:'P-8A Poseidon',qty:'rotational',role:'ISR'}],tags:['CENTCOM','PRE-POSITION']},
   {id:'etad',icao:'ETAD',name:'Spangdahlem AB',sub:'ETAD // Germany',status:'ACTIVE',lat:49.972,lng:6.693,arrCnt:0,socomCnt:0,intel:'Army-Z staging. PMZ/JMZ/AMZ series route via ETAD.',aircraftTypes:[{type:'C-17A Globemaster III',qty:'transit',role:'Strategic Airlift'},{type:'F-16C',qty:'52nd FW',role:'Fighter'}],tags:['EUCOM','ARMY-Z']},
 ]
@@ -243,7 +243,8 @@ function AircraftTab({aircraft,auth}) {
   const sortedCats = Object.entries(grouped).sort((a,b)=>(AC_CAT[a[0]]?.order||99)-(AC_CAT[b[0]]?.order||99))
   // Default: ALL categories expanded
   const [expanded,setExpanded] = useState(()=>new Set(sortedCats.map(([cat])=>cat)))
-  const [showTails,setShowTails] = useState(null)
+  const [tailsOpen,setTailsOpen] = useState(new Set())
+  function toggleTails(key){setTailsOpen(prev=>{const s=new Set(prev);s.has(key)?s.delete(key):s.add(key);return s})}
 
   if(!aircraft?.length) return <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',...Z,fontSize:10,color:C.t3}}>No deployed aircraft data on file.</div>
 
@@ -283,25 +284,33 @@ function AircraftTab({aircraft,auth}) {
               <div style={{border:`1px solid ${meta.color}40`,borderTop:'none',background:'rgba(0,0,0,.12)',borderRadius:'0 0 2px 2px'}}>
                 {acs.map((ac,j)=>{
                   const tailKey=`${cat}-${j}`
-                  const tailsOpen=showTails===tailKey
+                  const isTailOpen=tailsOpen.has(tailKey)
                   return (
                     <div key={j} style={{borderBottom:`1px solid rgba(30,44,58,.4)`}}>
-                      <div onClick={()=>ac.tails?.length&&setShowTails(tailsOpen?null:tailKey)}
+                      <div onClick={()=>ac.tails?.length&&toggleTails(tailKey)}
                         style={{display:'flex',alignItems:'center',gap:8,padding:'8px 14px',
                           cursor:ac.tails?.length?'pointer':'default',
-                          background:tailsOpen?`${meta.color}0a`:'transparent',transition:'background .1s'}}>
+                          background:isTailOpen?`${meta.color}0a`:'transparent',transition:'background .1s'}}>
                         <span style={{...R,fontSize:13,fontWeight:700,color:C.tb,flex:1}}>{ac.type}</span>
                         <span style={{...Z,fontSize:11,color:meta.color,fontWeight:700,marginRight:ac.tails?.length?8:0}}>{ac.qty}</span>
                         {ac.tails?.length>0&&(
-                          <span style={{...Z,fontSize:9,color:C.t2}}>{tailsOpen?'▲':'▼'} {ac.tails.length}</span>
+                          <span style={{...Z,fontSize:9,color:C.t2}}>{isTailOpen?'▲':'▼'} {ac.tails.length}</span>
                         )}
                       </div>
-                      {tailsOpen&&ac.tails?.length>0&&(
+                      {isTailOpen&&ac.tails?.length>0&&(
                         <div style={{padding:'10px 16px 14px',background:'rgba(80,160,232,.04)'}}>
-                          <div style={{...R,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:8}}>CONFIRMED TAIL NUMBERS / CALLSIGNS</div>
+                          <div style={{...R,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:8}}>TAIL NUMBERS</div>
                           <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                            {ac.tails.map((t,k)=>(
-                              <span key={k} style={{...Z,fontSize:10,padding:'3px 8px',background:'rgba(80,160,232,.1)',border:'1px solid rgba(80,160,232,.2)',color:C.b,borderRadius:1}}>{t}</span>
+                            {ac.tails.length===0?(
+                              <span style={{...Z,fontSize:10,color:C.t3}}>N/A</span>
+                            ):ac.tails.map((t,k)=>(
+                              <a key={k} href={`https://www.jetphotos.com/registration/${encodeURIComponent(t)}`}
+                                target="_blank" rel="noopener noreferrer"
+                                style={{...Z,fontSize:10,padding:'3px 8px',background:'rgba(80,160,232,.1)',
+                                  border:'1px solid rgba(80,160,232,.2)',color:C.b,borderRadius:1,
+                                  textDecoration:'none'}}>
+                                {t} ↗
+                              </a>
                             ))}
                           </div>
                         </div>
