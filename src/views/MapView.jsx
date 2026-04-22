@@ -88,46 +88,65 @@ const ESC_GEO = {
   WATCH:   { fill:'#4a6070', stroke:'#4a6070' },
 }
 
-function mkIcon(sym, color, size=26, pulse=false, badge=null) {
-  const rip = pulse ? `<div style="position:absolute;inset:-5px;border:1.5px solid ${color};border-radius:2px;opacity:.35;animation:rp 2.2s infinite"></div>` : ''
-  const bdg = badge ? `<div style="position:absolute;top:-7px;right:-9px;background:#e85040;color:#07090b;font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:700;padding:1px 4px;border-radius:1px;min-width:14px;text-align:center;line-height:13px">${badge}</div>` : ''
-  const s = size + 14
+function mkIcon(sym, color, size=20, pulse=false, badge=null) {
+  // Fixed-size diamond marker for airbases, events, CONUS.
+  // sym is a short text code (1-3 chars), not an emoji.
+  const bdg = badge
+    ? `<div style="position:absolute;top:-8px;right:-6px;background:#e85040;color:#fff;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;padding:0 3px;line-height:12px;min-width:12px;text-align:center">${badge}</div>`
+    : ''
+  const pulseStyle = pulse
+    ? 'animation:mk_p 2.4s ease-in-out infinite;'
+    : ''
   return L.divIcon({
-    html:`<div style="position:relative;width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center">${rip}<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;background:rgba(7,9,11,.88);border:1.5px solid ${color};border-radius:2px;font-size:${Math.round(size*.5)}px;box-shadow:0 0 10px ${color}44;z-index:1">${sym}</div>${bdg}</div><style>@keyframes rp{0%{transform:scale(.85);opacity:.6}70%{transform:scale(1.4);opacity:0}100%{opacity:0}}</style>`,
-    className:'', iconSize:[s,s], iconAnchor:[s/2,s/2],
+    className: '',
+    iconSize:   [size, size],
+    iconAnchor: [size/2, size/2],
+    html: `
+      <style>@keyframes mk_p{0%,100%{opacity:1}50%{opacity:.45}}</style>
+      <div style="position:relative;width:${size}px;height:${size}px">
+        ${bdg}
+        <div style="
+          width:${size}px;height:${size}px;
+          background:rgba(7,9,11,0.88);
+          border:1px solid ${color};
+          display:flex;align-items:center;justify-content:center;
+          font-family:'Share Tech Mono',monospace;
+          font-size:${Math.max(7,Math.round(size*0.42))}px;
+          font-weight:700;color:#dceaf0;
+          box-sizing:border-box;
+          ${pulseStyle}
+        ">${sym}</div>
+      </div>`,
   })
 }
 
-// ── Military track block marker ──────────────────────────────
-// Hull designation in Share Tech Mono inside bordered box.
-// Mirrors NATO standard symbology style: small rectangle with unit ID.
-// pulse=true adds animation ring for deployed/surge status.
+// ── Micro track block marker (Palantir/tactical style) ───────
+// Rigid 44×16px box. No padding. Scales correctly at all zoom levels.
+// className:'' is critical — removes Leaflet's default white background/shadow.
 function mkTrackBlock(label, color, pulse=false) {
-  const w = Math.max(44, label.length * 7 + 16)
-  const ring = pulse
-    ? `<div style="position:absolute;inset:-4px;border:1px solid ${color};opacity:.4;animation:rp 2.2s infinite;pointer-events:none"></div>`
+  const pulseStyle = pulse
+    ? `outline:1px solid ${color};outline-offset:2px;animation:tb_pulse 2.4s ease-in-out infinite;`
     : ''
   return L.divIcon({
-    html: `<div style="position:relative">
-      ${ring}
-      <div style="
-        min-width:${w}px;height:20px;
-        display:flex;align-items:center;justify-content:center;
-        background:rgba(7,9,11,.92);
-        border:1.5px solid ${color};
-        font-family:'Share Tech Mono',monospace;
-        font-size:10px;font-weight:700;
-        color:#dceaf0;
-        letter-spacing:1px;
-        padding:0 6px;
-        box-shadow:0 0 8px ${color}44;
-        white-space:nowrap;
-      ">${label}</div>
-    </div>
-    <style>@keyframes rp{0%{transform:scale(.85);opacity:.5}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}</style>`,
     className: '',
-    iconSize: [w, 20],
-    iconAnchor: [w/2, 10],
+    iconSize:   [44, 16],
+    iconAnchor: [22, 8],
+    html: `
+      <style>@keyframes tb_pulse{0%,100%{outline-color:${color};outline-offset:2px}50%{outline-color:transparent;outline-offset:5px}}</style>
+      <div style="
+        width:44px;height:16px;
+        background:rgba(7,9,11,0.88);
+        border:1px solid ${color};
+        display:flex;align-items:center;justify-content:center;
+        font-family:'Share Tech Mono',monospace;
+        font-size:9px;font-weight:700;
+        color:#dceaf0;
+        letter-spacing:0.5px;
+        box-sizing:border-box;
+        overflow:hidden;
+        white-space:nowrap;
+        ${pulseStyle}
+      ">${label}</div>`,
   })
 }
 
@@ -502,7 +521,7 @@ export function MapView({ auth }) {
 
           {repositionAsset&&repositionPos&&(
             <Marker position={[repositionPos.lat,repositionPos.lng]} draggable={true}
-              icon={mkIcon('●',C.a,32,true)}
+              icon={mkTrackBlock('REPOS',C.a,true)}
               eventHandlers={{dragend:(e)=>{const p=e.target.getLatLng();setRepositionPos({lat:p.lat,lng:p.lng})}}} />
           )}
 
@@ -511,7 +530,7 @@ export function MapView({ auth }) {
           {layers.airbases&&allAssets.filter(a=>a.type==='airbase'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>{
             const col=a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g
             return (
-              <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('✈',col,26,a.status==='SURGE',a.arrCnt?'▲'+a.arrCnt:null)} eventHandlers={{click:()=>selectAsset(a)}}>
+              <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('AB',col,18,a.status==='SURGE',a.arrCnt?'+'+a.arrCnt:null)} eventHandlers={{click:()=>selectAsset(a)}}>
                 <Popup closeButton={false}>
                   <div style={{...Z,fontSize:11,minWidth:190}}>
                     <div style={{...R,fontSize:14,fontWeight:700,color:C.tb,marginBottom:4}}>{a.name}</div>
@@ -530,7 +549,7 @@ export function MapView({ auth }) {
             const meta=CONUS_META[icao], coords=ICAO_COORDS[icao]
             if(!coords) return null
             return (
-              <Marker key={icao+'_c'} position={coords} icon={mkIcon('◄',data.socom>0?C.p:C.b,22,false,data.total>5?String(data.total):null)}
+              <Marker key={icao+'_c'} position={coords} icon={mkIcon('US',data.socom>0?C.p:C.b,18,false,data.total>5?String(data.total):null)}
                 eventHandlers={{click:()=>selectAsset({id:icao,name:meta.name||icao,sub:`${icao} // ${meta.region||'CONUS'}`,type:'conus_base',lat:coords[0],lng:coords[1],...data,...meta})}}>
                 <Popup closeButton={false}>
                   <div style={{...Z,fontSize:11}}>
@@ -545,7 +564,9 @@ export function MapView({ auth }) {
 
           {layers.carriers&&allAssets.filter(a=>a.type==='carrier'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
             const col=a.status==='REFIT'?C.t3:a.status==='SURGE'?C.r:C.b
-            const hull=(a.csg||a.hull||a.sub?.split('//')[0]?.trim()||a.id?.toUpperCase()||'').replace('CVN-','CVN').replace('R0','R')
+            // Extract hull designation: prefer explicit hull, fall back to sub prefix
+            const rawHull = a.hull || a.sub?.split('//')[0]?.trim() || a.id?.toUpperCase() || ''
+            const hull = const hull = rawHull.replace(/^(USS|HMS) /i,'').slice(0,8).trim() || 'CVG'
             return (
               <Marker key={a.id} position={[a.lat,a.lng]}
                 icon={mkTrackBlock(hull, col, a.status==='DEPLOYED'||a.status==='SURGE')}
@@ -560,7 +581,7 @@ export function MapView({ auth }) {
             )
           })}
           {layers.destroyers&&allAssets.filter(a=>a.type==='destroyer'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)&&repositionAsset?.id!==a.id).map(a=>{
-            const hull=(a.hull||a.sub?.split('//')[0]?.trim()||'').replace('DDG-','DDG').replace('D3','D')
+            const hull = (a.hull||a.sub?.split('//')[0]?.trim()||'').slice(0,7).trim()
             return (
               <Marker key={a.id} position={[a.lat,a.lng]}
                 icon={mkTrackBlock(hull, C.b, false)}
@@ -606,7 +627,7 @@ export function MapView({ auth }) {
             )
           })}
           {layers.strikes&&allAssets.filter(a=>a.type==='strike'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
-            <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('●',C.r,24,true)} eventHandlers={{click:()=>selectAsset(a)}} />
+            <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('EV',C.r,16,true)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
         </MapContainer>
 
