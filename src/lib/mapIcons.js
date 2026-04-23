@@ -121,19 +121,6 @@ export function mkInfraIcon(status = 'ACTIVE') {
   })
 }
 
-// Teal label block: key port assets. Width scales to label length.
-export function mkPortIcon(shortName = 'PORT') {
-  const col = '#20c0a0'
-  const label = (shortName || 'PORT').slice(0, 10).toUpperCase()
-  const w = Math.min(Math.max(label.length * 5 + 12, 32), 56)
-  return L.divIcon({
-    className: '',
-    iconSize:   [w, 14],
-    iconAnchor: [w / 2, 7],
-    html: `<div style="width:${w}px;height:14px;background:rgba(7,9,11,0.92);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:7px;font-weight:700;color:${col};box-sizing:border-box;overflow:hidden;white-space:nowrap;letter-spacing:0.5px;">${label}</div>`,
-  })
-}
-
 // Strike pulse badge: corner-ticked square + count chip. hot=red, warm=amber, old=slate.
 export function mkPulseIcon(count, recency = 'old') {
   const col = recency === 'hot' ? '#e85040' : recency === 'warm' ? '#f0a040' : '#4a6070'

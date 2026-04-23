@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, useMapEvents, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
-import { ICON_IDS, SITE_ICON_META, SITE_ICONS, STATE_COLORS } from '../lib/iconLibrary'
+import { ICON_IDS, SITE_ICON_META, SITE_ICONS, STATE_COLORS, InlineIcon } from '../lib/iconLibrary'
 
 const Z={fontFamily:"'Share Tech Mono',monospace"}
 const R={fontFamily:"'Rajdhani',sans-serif"}
@@ -359,10 +359,9 @@ export function CountryEditor() {
           </div>
           {sites.map(s=>{
             const sc={DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g,UNKNOWN:C.t2}[s.status]||C.t2
-            const siteIcons={strike:'💥',nuclear:'☢️',missile:'🚀',naval:'⚓',airbase:'✈',facility:'🏭',radar:'📡'}
             return (
               <div key={s.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 20px',borderBottom:`1px solid rgba(30,44,58,.4)`}}>
-                <span style={{fontSize:16}}>{siteIcons[s.site_type]||'💥'}</span>
+                <InlineIcon id={s.site_type||'facility'} status={s.status} size={16} />
                 <div style={{...Z,fontSize:9,fontWeight:700,color:C.t3,width:24}}>{s.country_code}</div>
                 <div style={{flex:1}}>
                   <div style={{...R,fontSize:13,fontWeight:600,color:C.tb}}>{s.name}</div>

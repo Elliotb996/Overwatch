@@ -1,3 +1,5 @@
+import React from 'react'
+
 // ─── Primitive helpers ────────────────────────────────────────────────────
 // Mirror the HTML prototype's helper kit, but handle both hex and 'currentColor'
 // so SITE_ICONS (static/CSS) and renderSvgString() (Leaflet/programmatic) both work.
@@ -221,7 +223,7 @@ const GLYPHS = {
 export const SITE_ICONS = Object.fromEntries(
   Object.entries(GLYPHS).map(([id, glyph]) => [
     id,
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="${SW}" stroke-linecap="square">${glyph('currentColor')}</svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%" style="display:block" fill="none" stroke="currentColor" stroke-width="${SW}" stroke-linecap="square">${glyph('currentColor')}</svg>`,
   ])
 )
 
@@ -274,7 +276,7 @@ export function renderSvgString(id, color, size = 32, { state = null, destroyed 
        <line x1="27" y1="5"  x2="5"  y2="27" stroke="${col}" stroke-width="1.4" stroke-linecap="square"/>`
     : ''
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="${size}" height="${size}" fill="none">${inner}${xMark}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="${size}" height="${size}" overflow="hidden" fill="none">${inner}${xMark}</svg>`
 }
 
 // ─── Leaflet divIcon factory ──────────────────────────────────────────────
@@ -286,7 +288,18 @@ export function mkSiteIconHtml(id, color, size = 24, { state = null, destroyed =
   const svg = renderSvgString(id, col, size, { state, destroyed })
   const isPulse = state === 'critical'
   const pulseRing = isPulse
-    ? `<span style="position:absolute;inset:-5px;border:1px solid ${col};border-radius:50%;opacity:0.35;pointer-events:none;"></span>`
+    ? `<span style="position:absolute;inset:1px;border:1px solid ${col};border-radius:50%;opacity:0.35;pointer-events:none;"></span>`
     : ''
   return `<span style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">${pulseRing}${svg}</span>`
+}
+
+// ─── React inline icon component ─────────────────────────────────────────
+// Renders the currentColor SVG for any icon ID in a fixed-size div.
+// Set `status` to drive color from STATE_COLORS (defaults to nominal green).
+export function InlineIcon({ id, status, size = 16 }) {
+  const col = STATE_COLORS[status] || STATE_COLORS.nominal
+  return React.createElement('div', {
+    dangerouslySetInnerHTML: { __html: SITE_ICONS[id] || SITE_ICONS['facility'] },
+    style: { width: size, height: size, flexShrink: 0, color: col, lineHeight: 0, display: 'inline-block' },
+  })
 }

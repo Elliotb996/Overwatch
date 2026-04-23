@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
 import { mkSiteIcon } from '../lib/mapIcons'
+import { InlineIcon } from '../lib/iconLibrary'
 
 const Z = { fontFamily:"'Share Tech Mono',monospace" }
 const R = { fontFamily:"'Rajdhani',sans-serif" }
@@ -25,13 +26,6 @@ const ESC_COLORS = {
 
 // Strike site status → colour. Drives both icon border and list tag.
 const SITE_STATUS_COL = { DESTROYED:C.r, DAMAGED:C.a, ACTIVE:C.g, UNKNOWN:C.t2 }
-
-// Short type-code rendered in the crosshair reticle centre (4 chars max for legibility).
-// Keeps the marker language OVERWATCH-native rather than emoji-dependent.
-const SITE_TYPE_CODE = {
-  strike:'STR', nuclear:'NUC', missile:'MSL', naval:'NAV',
-  airbase:'AIR', facility:'FAC', radar:'RDR',
-}
 
 // ── mkStrikeIcon — OVERWATCH crosshair marker for strike sites ──
 // Corner-tick square (matches airbase aesthetic) with a NSEW crosshair
@@ -414,7 +408,7 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
               {sites.slice(0,5).map(s=>(
                 <div key={s.id} onClick={()=>setSelSite(selSite?.id===s.id?null:s)}
                   style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',borderBottom:`1px solid rgba(30,44,58,.4)`,cursor:'pointer',background:selSite?.id===s.id?'rgba(80,160,232,.06)':'transparent'}}>
-                  <SiteTypeGlyph type={s.site_type} color={SITE_STATUS_COL[s.status]||C.t2} />
+                  <InlineIcon id={s.site_type} status={s.status} size={14} />
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{...R,fontSize:12,fontWeight:600,color:C.tb,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name}</div>
                     <div style={{...Z,fontSize:8,color:C.t2}}>{s.strike_date||'—'} · {s.source||'—'}</div>
@@ -427,27 +421,6 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
         )}
       </div>
     </div>
-  )
-}
-
-// ── SiteTypeGlyph ──
-// Small SVG glyph replacing emojis in lists — matches platform design language.
-// Type → subtle variation in centre shape; status drives colour.
-function SiteTypeGlyph({type, color}) {
-  const shape = {
-    nuclear: <polygon points="10,4 14,12 6,12" fill={color}/>,
-    missile: <rect x="8" y="4" width="4" height="12" fill={color}/>,
-    naval:   <path d="M4,12 L10,6 L16,12 L14,14 L6,14 Z" fill={color}/>,
-    airbase: <circle cx="10" cy="10" r="3" fill={color}/>,
-    facility:<rect x="5" y="7" width="10" height="8" fill={color}/>,
-    radar:   <circle cx="10" cy="10" r="4" fill="none" stroke={color} strokeWidth="1.5"/>,
-    strike:  <g><line x1="5" y1="5" x2="15" y2="15" stroke={color} strokeWidth="1.5"/><line x1="15" y1="5" x2="5" y2="15" stroke={color} strokeWidth="1.5"/></g>,
-  }[type] || <circle cx="10" cy="10" r="2" fill={color}/>
-  return (
-    <svg viewBox="0 0 20 20" width="16" height="16" style={{flexShrink:0}}>
-      <rect x="1" y="1" width="18" height="18" fill="rgba(7,9,11,0.6)" stroke={color} strokeWidth="1"/>
-      {shape}
-    </svg>
   )
 }
 
@@ -593,7 +566,7 @@ function SingleSiteMarker({site, selSite, setSelSite, onExpand}) {
       icon={mkSiteIcon(site.site_category || site.site_type, site.status)}
       eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setSelSite(isSel ? null : site)}}}>
       <Tooltip direction="top" offset={[0,-12]} opacity={1} className="ow-tip">
-        <span style={{...Z,fontSize:9,color:col,letterSpacing:1}}>{SITE_TYPE_CODE[site.site_type]||'STR'}</span>
+        <span style={{...Z,fontSize:9,color:col,letterSpacing:1,display:'inline-flex',alignItems:'center'}}><InlineIcon id={site.site_type} status={site.status} size={12} /></span>
         <span style={{...R,fontSize:12,fontWeight:700,color:C.tb,marginLeft:6}}>{site.name}</span>
       </Tooltip>
       <Popup closeButton={false}>
@@ -671,7 +644,7 @@ function StrikeSitesTab({sites,auth,selSite,setSelSite,code,siteListRef}) {
                   background:isSel?'rgba(80,160,232,.08)':'transparent',
                   borderLeft:`3px solid ${isSel?C.b:'transparent'}`,transition:'all .15s'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
-                  <SiteTypeGlyph type={s.site_type} color={sc} />
+                  <InlineIcon id={s.site_type} status={s.status} size={14} />
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{...R,fontSize:13,fontWeight:600,color:C.tb,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name}</div>
                     <div style={{...Z,fontSize:8,color:C.t2}}>{s.site_type?.toUpperCase()} · {s.strike_date||'Date unknown'}</div>
@@ -715,7 +688,7 @@ function SiteDetail({site,auth,onClose}) {
   return (
     <div style={{overflow:'auto',height:'100%'}}>
       <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',background:C.bg4,borderBottom:`1px solid ${C.br}`,flexShrink:0}}>
-        <SiteTypeGlyph type={site.site_type} color={sc} />
+        <InlineIcon id={site.site_type} status={site.status} size={16} />
         <div style={{flex:1,minWidth:0}}>
           <div style={{...R,fontSize:17,fontWeight:700,color:C.tb}}>{site.name}</div>
           <div style={{...Z,fontSize:9,color:C.t2}}>{site.site_type?.toUpperCase()}</div>

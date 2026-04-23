@@ -6,7 +6,9 @@ import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
-import { mkIcon, mkTrackBlock, mkAirbaseIcon, mkSiteIcon, mkPortIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
+import { mkIcon, mkTrackBlock, mkAirbaseIcon, mkSiteIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
+import { InlineIcon } from '../lib/iconLibrary'
+import { StrikePulseSidebar } from '../components/StrikePulseSidebar'
 
 class ErrorBoundary extends React.Component {
   state = { error: null }
@@ -586,6 +588,7 @@ export function MapView({ auth }) {
   const [infraSites, setInfraSites] = useState([])
   const [portAssets, setPortAssets] = useState([])
   const [pulseWindow, setPulseWindow] = useState('48h')
+  const [selPulse, setSelPulse] = useState(null)
 
   useEffect(()=>{ try{localStorage.setItem('ow_layers',JSON.stringify(layers))}catch{} },[layers])
 
@@ -877,7 +880,7 @@ function onEachFeature(feature,layer) {
           ))}
 
           {layers.ports&&portAssets.filter(p=>p.lat&&p.lng).map(p=>(
-            <Marker key={`port-${p.id}`} position={[parseFloat(p.lat),parseFloat(p.lng)]} icon={mkPortIcon(p.designation||p.name?.split(' ').slice(-2).join(' '))}>
+            <Marker key={`port-${p.id}`} position={[parseFloat(p.lat),parseFloat(p.lng)]} icon={mkSiteIcon('port', p.status||'ACTIVE')}>
               <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'#20c0a0'}}>{p.port_category?.toUpperCase()||'PORT'}</span>
                 <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{p.name}</span>
@@ -890,7 +893,8 @@ function onEachFeature(feature,layer) {
             const recency=(row.strikes_24h||0)>0?'hot':(row.strikes_72h||0)>0?'warm':'old'
             if(!row.centroid_lat||!row.centroid_lng) return null
             return (
-              <Marker key={`pulse-${row.country_code}`} position={[parseFloat(row.centroid_lat),parseFloat(row.centroid_lng)]} icon={mkPulseIcon(count,recency)}>
+              <Marker key={`pulse-${row.country_code}`} position={[parseFloat(row.centroid_lat),parseFloat(row.centroid_lng)]} icon={mkPulseIcon(count,recency)}
+                eventHandlers={{click:()=>setSelPulse(row)}}>
                 <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
                   <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:recency==='hot'?C.r:recency==='warm'?C.a:C.t2}}>{row.country_code}</span>
                   <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{count} strikes / {pulseWindow}</span>
@@ -899,6 +903,14 @@ function onEachFeature(feature,layer) {
             )
           })}
         </MapContainer>
+
+        {selPulse&&(
+          <StrikePulseSidebar
+            countryCode={selPulse.country_code}
+            pulseRow={selPulse}
+            onClose={()=>setSelPulse(null)}
+          />
+        )}
 
         {repositionAsset?(
           <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',zIndex:900,display:'flex',alignItems:'center',gap:10,background:'rgba(7,9,11,.96)',border:`2px solid ${C.a}`,padding:'8px 16px',backdropFilter:'blur(8px)',maxWidth:'90%'}}>
