@@ -689,7 +689,7 @@ function onEachFeature(feature,layer) {
             </div>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,color:C.t3,marginBottom:4,marginTop:10}}>AVIATION</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
-              {[['airbases','AOR Bases'],['conus','CONUS Dep']].map(([k,lbl])=>(
+              {[['airbases','Air Bases'],['conus','CONUS Dep']].map(([k,lbl])=>(
                 <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
               ))}
             </div>
@@ -931,7 +931,7 @@ function onEachFeature(feature,layer) {
         )}
 
         <div style={{position:'absolute',top:0,left:0,right:0,zIndex:800,background:'rgba(7,9,11,.88)',borderBottom:`1px solid ${C.br}`,display:'flex',backdropFilter:'blur(6px)'}}>
-          {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'AOR BASES',v:bases,c:C.g},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.a}].map(({l,v,c})=>(
+          {[{l:'AMC FLIGHTS',v:loading?'…':flights.length,c:C.b},{l:'Air Base',v:bases,c:C.g},{l:'ACTIVE',v:flights.filter(f=>f.status==='ACTIVE').length,c:C.a}].map(({l,v,c})=>(
             <div key={l} style={{padding:'5px 14px',borderRight:`1px solid ${C.br}`}}>
               <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:1}}>{l}</div>
               <div style={{...R,fontSize:16,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
