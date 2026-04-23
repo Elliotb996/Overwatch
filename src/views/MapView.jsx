@@ -677,10 +677,25 @@ function onEachFeature(feature,layer) {
         </div>
         <div style={{borderBottom:`1px solid ${C.br}`}}>
           <PH title="Layers" />
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,padding:8}}>
-            {[['carriers','Carriers'],['destroyers','Destroyers'],['subs','Submarines'],['lmsr','Sealift'],['airbases','AOR Bases'],['conus','CONUS Dep'],['strikes','Events'],['strategic','Strategic'],['infrastructure','Infra'],['ports','Ports'],['strikePulse','Strike Pulse']].map(([k,lbl])=>(
-              <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
-            ))}
+          <div style={{padding:'4px 8px 6px'}}>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,color:C.t3,marginBottom:4,marginTop:4}}>NAVAL</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
+              {[['carriers','Carriers'],['destroyers','Destroyers'],['subs','Submarines'],['lmsr','Sealift'],['ports','Ports']].map(([k,lbl])=>(
+                <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
+              ))}
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,color:C.t3,marginBottom:4,marginTop:10}}>AVIATION</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
+              {[['airbases','AOR Bases'],['conus','CONUS Dep']].map(([k,lbl])=>(
+                <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
+              ))}
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,color:C.t3,marginBottom:4,marginTop:10}}>FACILITIES & INTEL</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
+              {[['strategic','Strategic'],['infrastructure','Infra'],['strikes','Events'],['strikePulse','Strike Pulse']].map(([k,lbl])=>(
+                <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
+              ))}
+            </div>
           </div>
           {layers.strikePulse&&(
             <div style={{padding:'4px 8px 8px',borderTop:`1px solid ${C.br}`}}>

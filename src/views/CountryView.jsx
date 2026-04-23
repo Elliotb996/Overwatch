@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents }
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
+import { mkSiteIcon } from '../lib/mapIcons'
 
 const Z = { fontFamily:"'Share Tech Mono',monospace" }
 const R = { fontFamily:"'Rajdhani',sans-serif" }
@@ -548,7 +549,7 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
                 const pos = positions[i] || {lat:cl.lat, lng:cl.lng}
                 return (
                   <Marker key={s.id} position={[pos.lat, pos.lng]}
-                    icon={mkStrikeIcon(s.status, selSite?.id === s.id)}
+                    icon={mkSiteIcon(s.site_category || s.site_type, s.status)}
                     eventHandlers={{click:(e)=>{
                       L.DomEvent.stopPropagation(e)
                       setSelSite(selSite?.id === s.id ? null : s)
@@ -589,7 +590,7 @@ function SingleSiteMarker({site, selSite, setSelSite, onExpand}) {
   const col = SITE_STATUS_COL[site.status] || C.t2
   return (
     <Marker position={[parseFloat(site.lat), parseFloat(site.lng)]}
-      icon={mkStrikeIcon(site.status, isSel)}
+      icon={mkSiteIcon(site.site_category || site.site_type, site.status)}
       eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setSelSite(isSel ? null : site)}}}>
       <Tooltip direction="top" offset={[0,-12]} opacity={1} className="ow-tip">
         <span style={{...Z,fontSize:9,color:col,letterSpacing:1}}>{SITE_TYPE_CODE[site.site_type]||'STR'}</span>

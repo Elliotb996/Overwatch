@@ -17,9 +17,9 @@ export function mkSiteIcon(iconId, status, alerts = 0) {
     : ''
   return L.divIcon({
     className: '',
-    iconSize:  [32, 32],
-    iconAnchor:[16, 16],
-    html: `<div style="position:relative;display:inline-block;">${mkSiteIconHtml(id, color, 32, { state })}${badge}</div>`,
+    iconSize:  [22, 22],
+    iconAnchor:[11, 11],
+    html: `<div style="position:relative;display:inline-block;width:22px;height:22px;">${mkSiteIconHtml(id, color, 22, { state })}${badge}</div>`,
   })
 }
 
