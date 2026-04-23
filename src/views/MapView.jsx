@@ -165,6 +165,53 @@ function mkAirbaseIcon(status, alerts = 0) {
 }
 
 
+function mkStrikeMapIcon(status='ACTIVE') {
+  const col = {DESTROYED:'#e85040',DAMAGED:'#f0a040',ACTIVE:'#39e0a0',UNKNOWN:'#4a6070'}[status]||'#4a6070'
+  return L.divIcon({ className:'', iconSize:[16,16], iconAnchor:[8,8],
+    html:`<svg viewBox="0 0 20 20" width="16" height="16" style="display:block;overflow:visible">
+      <rect x="3" y="3" width="14" height="14" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="1"/>
+      <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16" stroke="${col}" stroke-width="1" fill="none"/>
+      <line x1="10" y1="4.5" x2="10" y2="8" stroke="${col}" stroke-width="0.8"/>
+      <line x1="10" y1="12" x2="10" y2="15.5" stroke="${col}" stroke-width="0.8"/>
+      <line x1="4.5" y1="10" x2="8" y2="10" stroke="${col}" stroke-width="0.8"/>
+      <line x1="12" y1="10" x2="15.5" y2="10" stroke="${col}" stroke-width="0.8"/>
+      <circle cx="10" cy="10" r="1.8" fill="none" stroke="${col}" stroke-width="0.8"/>
+      <circle cx="10" cy="10" r="0.7" fill="${col}"/>
+    </svg>`,
+  })
+}
+function mkInfraIcon(status='ACTIVE') {
+  const col = {DESTROYED:'#e85040',DAMAGED:'#f0a040',ACTIVE:'#f0a040',UNKNOWN:'#4a6070'}[status]||'#f0a040'
+  return L.divIcon({ className:'', iconSize:[16,16], iconAnchor:[8,8],
+    html:`<svg viewBox="0 0 20 20" width="16" height="16" style="display:block;overflow:visible">
+      <path d="M10,2 L18,10 L10,18 L2,10 Z" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="1"/>
+      <circle cx="10" cy="10" r="1.5" fill="${col}"/>
+    </svg>`,
+  })
+}
+function mkPortIcon(shortName='PORT') {
+  const col = '#20c0a0'
+  const label = (shortName||'PORT').slice(0,10).toUpperCase()
+  const w = Math.min(Math.max(label.length * 5 + 12, 32), 56)
+  return L.divIcon({ className:'', iconSize:[w,14], iconAnchor:[w/2,7],
+    html:`<div style="width:${w}px;height:14px;background:rgba(7,9,11,0.92);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:7px;font-weight:700;color:${col};box-sizing:border-box;overflow:hidden;white-space:nowrap;letter-spacing:0.5px;">${label}</div>`,
+  })
+}
+function mkPulseIcon(count, recency='old') {
+  const col = recency==='hot'?'#e85040':recency==='warm'?'#f0a040':'#4a6070'
+  return L.divIcon({ className:'', iconSize:[26,26], iconAnchor:[13,13],
+    html:`<div style="position:relative;width:26px;height:26px">
+      <svg viewBox="0 0 20 20" width="26" height="26" style="display:block;overflow:visible">
+        <rect x="4" y="4" width="12" height="12" fill="${col}18" stroke="${col}" stroke-width="1.2"/>
+        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16" stroke="${col}" stroke-width="1" fill="none"/>
+        <circle cx="10" cy="10" r="2" fill="${col}"/>
+      </svg>
+      <div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${col};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box">${count}</div>
+    </div>`,
+  })
+}
+const PULSE_COLS = {'1h':'strikes_1h','12h':'strikes_12h','24h':'strikes_24h','48h':'strikes_48h','72h':'strikes_72h','7d':'strikes_7d'}
+
 const VIEWS = {
   WORLD:{center:[28,22],zoom:3}, MED:{center:[37,22],zoom:5},
   GULF:{center:[26,52],zoom:5}, ATLANTIC:{center:[44,-30],zoom:4}, INDOPACOM:{center:[20,120],zoom:4},
@@ -666,7 +713,7 @@ export function MapView({ auth }) {
       aircraftTypes:[],squadrons:[],escorts:[],
     }))
 
-  const LAYER_DEFAULTS = {carriers:true,destroyers:false,subs:false,lmsr:false,airbases:true,conus:false,strikes:true}
+  const LAYER_DEFAULTS = {carriers:true,destroyers:false,subs:false,lmsr:false,airbases:true,conus:false,strikes:true,strategic:false,infrastructure:false,ports:false,strikePulse:false}
   const [layers, setLayers] = useState(()=>{ try{const s=localStorage.getItem('ow_layers');return s?{...LAYER_DEFAULTS,...JSON.parse(s)}:LAYER_DEFAULTS}catch{return LAYER_DEFAULTS} })
   const [country, setCountry]   = useState('ALL')
   const [selAsset, setSelAsset] = useState(null)
@@ -678,8 +725,20 @@ export function MapView({ auth }) {
   const [repositionAsset, setRepositionAsset] = useState(null)
   const [repositionPos,   setRepositionPos]   = useState(null)
   const [repositionSaving, setRepositionSaving] = useState(false)
+  const [strikePulseData, setStrikePulseData] = useState([])
+  const [strategicSites, setStrategicSites] = useState([])
+  const [infraSites, setInfraSites] = useState([])
+  const [portAssets, setPortAssets] = useState([])
+  const [pulseWindow, setPulseWindow] = useState('48h')
 
   useEffect(()=>{ try{localStorage.setItem('ow_layers',JSON.stringify(layers))}catch{} },[layers])
+
+  useEffect(()=>{
+    supabase.from('strike_pulse').select('*').then(({data})=>setStrikePulseData(data||[]))
+    supabase.from('strike_sites').select('id,name,lat,lng,status,site_type,description,country_code').eq('is_strategic',true).then(({data})=>setStrategicSites(data||[]))
+    supabase.from('strike_sites').select('id,name,lat,lng,status,site_category,description,country_code').eq('is_infrastructure',true).then(({data})=>setInfraSites(data||[]))
+    supabase.from('assets').select('id,name,designation,lat,lng,port_category,country').eq('asset_type','port').eq('key_port',true).then(({data})=>setPortAssets(data||[]))
+  },[])
 
   async function confirmReposition() {
     if(!repositionAsset||!repositionPos) return
@@ -763,10 +822,25 @@ function onEachFeature(feature,layer) {
         <div style={{borderBottom:`1px solid ${C.br}`}}>
           <PH title="Layers" />
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,padding:8}}>
-            {[['carriers','Carriers'],['destroyers','Destroyers'],['subs','Submarines'],['lmsr','Sealift'],['airbases','AOR Bases'],['conus','CONUS Dep'],['strikes','Events']].map(([k,lbl])=>(
+            {[['carriers','Carriers'],['destroyers','Destroyers'],['subs','Submarines'],['lmsr','Sealift'],['airbases','AOR Bases'],['conus','CONUS Dep'],['strikes','Events'],['strategic','Strategic'],['infrastructure','Infra'],['ports','Ports'],['strikePulse','Strike Pulse']].map(([k,lbl])=>(
               <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
             ))}
           </div>
+          {layers.strikePulse&&(
+            <div style={{padding:'4px 8px 8px',borderTop:`1px solid ${C.br}`}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:C.t3,letterSpacing:2,marginBottom:5}}>PULSE WINDOW</div>
+              <div style={{display:'flex',gap:2,flexWrap:'wrap'}}>
+                {['1h','12h','24h','48h','72h','7d'].map(w=>(
+                  <button key={w} onClick={()=>setPulseWindow(w)}
+                    style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,padding:'2px 6px',cursor:'pointer',borderRadius:1,
+                      background:pulseWindow===w?'rgba(232,80,64,.22)':'transparent',
+                      border:`1px solid ${pulseWindow===w?C.r:C.br}`,color:pulseWindow===w?C.r:C.t2}}>
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div style={{borderBottom:`1px solid ${C.br}`}}>
           <PH title="Country" />
@@ -905,6 +979,54 @@ function onEachFeature(feature,layer) {
           {layers.strikes&&allAssets.filter(a=>a.type==='strike'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('EV',C.r,16)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
+
+          {layers.strategic&&strategicSites.filter(s=>s.lat&&s.lng).map(s=>(
+            <Marker key={`strat-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkStrikeMapIcon(s.status)}>
+              <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:{DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g}[s.status]||C.t2}}>{s.site_type?.toUpperCase()||'STR'}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
+              </Tooltip>
+              <Popup closeButton={false}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,minWidth:180}}>
+                  <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:13,fontWeight:700,color:'#dceaf0',marginBottom:3}}>{s.name}</div>
+                  <div style={{fontSize:9,color:{DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g}[s.status]||C.t2,letterSpacing:1}}>{s.status} · {s.site_type?.toUpperCase()}</div>
+                  <div onClick={()=>navigate(`/country/${s.country_code}`)} style={{fontFamily:"'Rajdhani',sans-serif",fontSize:10,fontWeight:600,color:'#50a0e8',marginTop:6,cursor:'pointer'}}>→ COUNTRY VIEW</div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {layers.infrastructure&&infraSites.filter(s=>s.lat&&s.lng).map(s=>(
+            <Marker key={`infra-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkInfraIcon(s.status)}>
+              <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.a}}>{s.site_category?.toUpperCase()||'INFRA'}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
+              </Tooltip>
+            </Marker>
+          ))}
+
+          {layers.ports&&portAssets.filter(p=>p.lat&&p.lng).map(p=>(
+            <Marker key={`port-${p.id}`} position={[parseFloat(p.lat),parseFloat(p.lng)]} icon={mkPortIcon(p.designation||p.name?.split(' ').slice(-2).join(' '))}>
+              <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'#20c0a0'}}>{p.port_category?.toUpperCase()||'PORT'}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{p.name}</span>
+              </Tooltip>
+            </Marker>
+          ))}
+
+          {layers.strikePulse&&strikePulseData.filter(row=>(row[PULSE_COLS[pulseWindow]]||0)>0).map(row=>{
+            const count=row[PULSE_COLS[pulseWindow]]||0
+            const recency=(row.strikes_24h||0)>0?'hot':(row.strikes_72h||0)>0?'warm':'old'
+            if(!row.centroid_lat||!row.centroid_lng) return null
+            return (
+              <Marker key={`pulse-${row.country_code}`} position={[parseFloat(row.centroid_lat),parseFloat(row.centroid_lng)]} icon={mkPulseIcon(count,recency)}>
+                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:recency==='hot'?C.r:recency==='warm'?C.a:C.t2}}>{row.country_code}</span>
+                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{count} strikes / {pulseWindow}</span>
+                </Tooltip>
+              </Marker>
+            )
+          })}
         </MapContainer>
 
         {repositionAsset?(
@@ -932,6 +1054,12 @@ function onEachFeature(feature,layer) {
               <div style={{...R,fontSize:16,fontWeight:700,color:c,lineHeight:1}}>{v}</div>
             </div>
           ))}
+          {layers.strikePulse&&(
+            <div style={{padding:'5px 14px',borderRight:`1px solid ${C.br}`}}>
+              <div style={{...Z,fontSize:8,letterSpacing:2,color:C.t3,marginBottom:1}}>PULSE/{pulseWindow.toUpperCase()}</div>
+              <div style={{...R,fontSize:16,fontWeight:700,color:C.r,lineHeight:1}}>{strikePulseData.filter(r=>(r[PULSE_COLS[pulseWindow]]||0)>0).length}</div>
+            </div>
+          )}
           <div style={{padding:'5px 14px',marginLeft:'auto',...Z,fontSize:9,color:C.t3,display:'flex',alignItems:'center',gap:6}}>
             {countryIntel.length>0&&<span style={{color:C.g}}>● {countryIntel.length} countries tracked</span>}
           </div>
@@ -953,6 +1081,8 @@ function onEachFeature(feature,layer) {
         {[{l:'NAVAL',v:naval,c:C.b},{l:'BASES',v:bases,c:C.g},{l:'LMSR',v:LMSR_DATA.length,c:C.y},{l:'AMC',v:loading?'…':flights.length,c:C.b}].map(({l,v,c})=>(
           <span key={l} style={{...Z,fontSize:10,color:C.t2}}>{l} <b style={{color:c,fontWeight:400}}>{v}</b></span>
         ))}
+        {layers.strategic&&<span style={{...Z,fontSize:10,color:C.t2}}>STRAT <b style={{color:C.r,fontWeight:400}}>{strategicSites.length}</b></span>}
+        {layers.ports&&<span style={{...Z,fontSize:10,color:C.t2}}>PORTS <b style={{color:'#20c0a0',fontWeight:400}}>{portAssets.length}</b></span>}
         {auth?.isOwner&&<span style={{...Z,fontSize:9,color:C.g,marginLeft:'auto',letterSpacing:1}}>◈ OWNER MODE</span>}
         {auth?.isAdmin&&!auth?.isOwner&&<span style={{...Z,fontSize:9,color:C.a,marginLeft:'auto',letterSpacing:1}}>● ADMIN MODE</span>}
       </div>
