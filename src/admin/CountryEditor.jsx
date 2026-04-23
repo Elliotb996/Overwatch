@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, useMapEvents, Marker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
+import { ICON_IDS, SITE_ICON_META, SITE_ICONS, STATE_COLORS } from '../lib/iconLibrary'
 
 const Z={fontFamily:"'Share Tech Mono',monospace"}
 const R={fontFamily:"'Rajdhani',sans-serif"}
@@ -66,6 +67,57 @@ const COUNTRY_CENTERS = {
   IR:[33,53],JO:[31.2,36.5],IL:[31.5,35],KW:[29.3,47.5],SA:[24,45],QA:[25.3,51.2],
   AE:[24.5,54.5],DE:[51,10],GB:[53,-1.5],GR:[39,22.5],IT:[42.5,12.5],FR:[46,2.5],
   YE:[15.5,48],SY:[35,38],IQ:[33,44],LB:[33.8,35.8],
+}
+
+// ── Visual icon picker — replaces the plain site_type <select> ──
+// Shows all 21 library icons in a grid with label so the user has a
+// visual reference when assigning a type to a strike site.
+function IconPicker({ value, onChange }) {
+  const statusColor = { nominal:C.g, elevated:C.a, critical:C.r, dormant:C.t2 }
+  // Group icons by section for visual separation
+  const groups = [
+    { label:'STRIKE SITES', ids: ICON_IDS.slice(0,9) },
+    { label:'ENERGY',       ids: ICON_IDS.slice(9,15) },
+    { label:'STRATEGIC',    ids: ICON_IDS.slice(15) },
+  ]
+  return (
+    <div style={{background:C.bg2,border:`1px solid ${C.br}`,borderRadius:1}}>
+      {groups.map(grp => (
+        <div key={grp.label}>
+          <div style={{...Z,fontSize:7,color:C.t3,letterSpacing:3,padding:'5px 10px 3px',borderBottom:`1px solid ${C.br}`}}>
+            {grp.label}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(62px,1fr))',gap:2,padding:4}}>
+            {grp.ids.map(id => {
+              const meta   = SITE_ICON_META[id]
+              const isSel  = value === id
+              const col    = isSel ? C.a : C.t3
+              return (
+                <div key={id} onClick={() => onChange(id)}
+                  style={{
+                    display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+                    padding:'6px 2px 4px',cursor:'pointer',borderRadius:1,
+                    background: isSel ? 'rgba(240,160,64,0.12)' : 'transparent',
+                    border:`1px solid ${isSel ? C.a : 'transparent'}`,
+                    transition:'background .1s',
+                  }}
+                  onMouseEnter={e=>{ if(!isSel) e.currentTarget.style.background='rgba(255,255,255,.04)' }}
+                  onMouseLeave={e=>{ if(!isSel) e.currentTarget.style.background='transparent' }}>
+                  <div style={{color:col,width:28,height:28,flexShrink:0}}
+                    dangerouslySetInnerHTML={{__html:SITE_ICONS[id]}} />
+                  <div style={{...Z,fontSize:6.5,color:isSel?C.a:C.t2,textAlign:'center',
+                    letterSpacing:0.3,lineHeight:1.2,wordBreak:'break-word',width:'100%',
+                    paddingInline:1}}>
+                    {meta.name.split(' · ')[0].split(' / ')[0]}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function CountryEditor() {
@@ -368,13 +420,13 @@ export function CountryEditor() {
                 placeholder="Natanz Nuclear Facility"
                 style={{width:'100%',padding:'8px 10px',background:C.bg2,border:`1px solid ${C.br}`,color:C.t1,...Z,fontSize:11,borderRadius:1,outline:'none',boxSizing:'border-box'}} />
             </div>
-            {/* Site type */}
-            <div>
-              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:5,letterSpacing:2}}>SITE TYPE</div>
-              <select value={site.site_type||'strike'} onChange={e=>setEditingSite(s=>({...s,site_type:e.target.value}))}
-                style={{width:'100%',padding:'8px 10px',background:C.bg2,border:`1px solid ${C.br}`,color:C.t1,...Z,fontSize:11,borderRadius:1,outline:'none',boxSizing:'border-box'}}>
-                {['strike','nuclear','missile','naval','airbase','facility','radar'].map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
+            {/* Site type — visual icon picker spanning both columns */}
+            <div style={{gridColumn:'1 / -1'}}>
+              <div style={{...Z,fontSize:8,color:C.t3,marginBottom:6,letterSpacing:2}}>
+                SITE TYPE / ICON
+                {site.site_type&&<span style={{color:C.a,marginLeft:8}}>{SITE_ICON_META[site.site_type]?.name||site.site_type}</span>}
+              </div>
+              <IconPicker value={site.site_type||'facility'} onChange={v=>setEditingSite(s=>({...s,site_type:v}))} />
             </div>
             {/* Status */}
             <div>

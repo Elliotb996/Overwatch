@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
-import { mkIcon, mkTrackBlock, mkAirbaseIcon, mkStrikeMapIcon, mkInfraIcon, mkPortIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
+import { mkIcon, mkTrackBlock, mkAirbaseIcon, mkSiteIcon, mkPortIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
 
 class ErrorBoundary extends React.Component {
   state = { error: null }
@@ -837,7 +837,7 @@ function onEachFeature(feature,layer) {
           ))}
 
           {layers.strategic&&strategicSites.filter(s=>s.lat&&s.lng).map(s=>(
-            <Marker key={`strat-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkStrikeMapIcon(s.status)}>
+            <Marker key={`strat-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_type, s.status)}>
               <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:{DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g}[s.status]||C.t2}}>{s.site_type?.toUpperCase()||'STR'}</span>
                 <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
@@ -853,7 +853,7 @@ function onEachFeature(feature,layer) {
           ))}
 
           {layers.infrastructure&&infraSites.filter(s=>s.lat&&s.lng).map(s=>(
-            <Marker key={`infra-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkInfraIcon(s.status)}>
+            <Marker key={`infra-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_category, s.status)}>
               <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.a}}>{s.site_category?.toUpperCase()||'INFRA'}</span>
                 <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>

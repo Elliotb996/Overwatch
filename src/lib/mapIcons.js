@@ -1,4 +1,27 @@
 import L from 'leaflet'
+import { mkSiteIconHtml, STATE_COLORS, SITE_ICON_META } from './iconLibrary.js'
+
+// Maps strike_sites.status → iconLibrary state key
+const _statusToState = { ACTIVE:'nominal', DAMAGED:'elevated', DESTROYED:'critical', UNKNOWN:'dormant' }
+
+// Unified site icon — uses the 21-icon SVG library.
+// iconId: any key from ICON_IDS (missile, nuclear, radar, etc.) — falls back to 'facility'.
+// status: ACTIVE | DAMAGED | DESTROYED | UNKNOWN
+// alerts: integer badge count (0 = no badge)
+export function mkSiteIcon(iconId, status, alerts = 0) {
+  const state = _statusToState[status] || 'dormant'
+  const color = STATE_COLORS[state]
+  const id    = SITE_ICON_META[iconId] ? iconId : 'facility'
+  const badge = alerts > 0
+    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${color};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
+    : ''
+  return L.divIcon({
+    className: '',
+    iconSize:  [32, 32],
+    iconAnchor:[16, 16],
+    html: `<div style="position:relative;display:inline-block;">${mkSiteIconHtml(id, color, 32, { state })}${badge}</div>`,
+  })
+}
 
 export function mkIcon(sym, color, size = 18, badge = null) {
   const bdg = badge
