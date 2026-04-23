@@ -571,7 +571,7 @@ export function MapView({ auth }) {
       aircraftTypes:[],squadrons:[],escorts:[],
     }))
 
-  const LAYER_DEFAULTS = {carriers:true,destroyers:false,subs:false,lmsr:false,airbases:true,conus:false,strikes:true,strategic:false,infrastructure:false,ports:false,strikePulse:false}
+  const LAYER_DEFAULTS = {carriers:true,destroyers:false,subs:false,lmsr:false,airbases:true,conus:false,strikes:true,strategic:false,Infrastructurestructure:false,ports:false,strikePulse:false}
   const [layers, setLayers] = useState(()=>{ try{const s=localStorage.getItem('ow_layers');return s?{...LAYER_DEFAULTS,...JSON.parse(s)}:LAYER_DEFAULTS}catch{return LAYER_DEFAULTS} })
   const [country, setCountry]   = useState('ALL')
   const [selAsset, setSelAsset] = useState(null)
@@ -585,7 +585,7 @@ export function MapView({ auth }) {
   const [repositionSaving, setRepositionSaving] = useState(false)
   const [strikePulseData, setStrikePulseData] = useState([])
   const [strategicSites, setStrategicSites] = useState([])
-  const [infraSites, setInfraSites] = useState([])
+  const [InfrastructureSites, setInfrastructureSites] = useState([])
   const [portAssets, setPortAssets] = useState([])
   const [pulseWindow, setPulseWindow] = useState('48h')
   const [selPulse, setSelPulse] = useState(null)
@@ -596,7 +596,7 @@ export function MapView({ auth }) {
   useEffect(()=>{
     supabase.from('strike_pulse').select('*').then(({data})=>setStrikePulseData(data||[]))
     supabase.from('strike_sites').select('id,name,lat,lng,status,site_type,description,country_code').eq('is_strategic',true).then(({data})=>setStrategicSites(data||[]))
-    supabase.from('strike_sites').select('id,name,lat,lng,status,site_category,description,country_code').eq('is_infrastructure',true).then(({data})=>setInfraSites(data||[]))
+    supabase.from('strike_sites').select('id,name,lat,lng,status,site_category,description,country_code').eq('is_Infrastructurestructure',true).then(({data})=>setInfrastructureSites(data||[]))
     supabase.from('assets').select('id,name,designation,lat,lng,port_category,country').eq('asset_type','port').eq('key_port',true).then(({data})=>setPortAssets(data||[]))
   },[])
 
@@ -698,7 +698,7 @@ function onEachFeature(feature,layer) {
             </div>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,letterSpacing:2,color:C.t3,marginBottom:4,marginTop:10}}>FACILITIES & INTEL</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3}}>
-              {[['strategic','Strategic'],['infrastructure','Infra'],['strikes','Events'],['strikePulse','Strike Pulse']].map(([k,lbl])=>(
+              {[['strategic','Strategic'],['Infrastructurestructure','Infrastructure'],['strikes','Events'],['strikePulse','Strike Pulse']].map(([k,lbl])=>(
                 <LyrBtn key={k} label={lbl} on={layers[k]} onClick={()=>setLayers(l=>({...l,[k]:!l[k]}))} />
               ))}
             </div>
@@ -874,11 +874,11 @@ function onEachFeature(feature,layer) {
             </Marker>
           ))}
 
-          {layers.infrastructure&&infraSites.filter(s=>s.lat&&s.lng).map(s=>(
-            <Marker key={`infra-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_category, s.status)}
+          {layers.Infrastructurestructure&&InfrastructureSites.filter(s=>s.lat&&s.lng).map(s=>(
+            <Marker key={`Infrastructure-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_category, s.status)}
               eventHandlers={{click:()=>{setSelSite(s);setSelAsset(null);setSelCor(null);setSelPulse(null)}}}>
               <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
-                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.a}}>{s.site_category?.toUpperCase()||'INFRA'}</span>
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.a}}>{s.site_category?.toUpperCase()||'Infrastructure'}</span>
                 <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
               </Tooltip>
             </Marker>
