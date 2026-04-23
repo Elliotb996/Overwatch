@@ -27,33 +27,6 @@ const ESC_COLORS = {
 // Strike site status → colour. Drives both icon border and list tag.
 const SITE_STATUS_COL = { DESTROYED:C.r, DAMAGED:C.a, ACTIVE:C.g, UNKNOWN:C.t2 }
 
-// ── mkStrikeIcon — OVERWATCH crosshair marker for strike sites ──
-// Corner-tick square (matches airbase aesthetic) with a NSEW crosshair
-// reticle over the centre. Distinct silhouette from airbase at a glance.
-// Status → border colour. Selected flag adds outer glow.
-function mkStrikeIcon(status='UNKNOWN', selected=false) {
-  const col = SITE_STATUS_COL[status] || C.t2
-  const size = selected ? 24 : 20
-  const glow = selected ? `filter:drop-shadow(0 0 6px ${col});` : ''
-  return L.divIcon({
-    className: '',
-    iconSize:   [size, size],
-    iconAnchor: [size/2, size/2],
-    html: `<div style="position:relative;width:${size}px;height:${size}px;${glow}">
-      <svg viewBox="0 0 20 20" width="${size}" height="${size}" style="display:block;overflow:visible">
-        <rect x="3" y="3" width="14" height="14" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="${selected?1.5:1}"/>
-        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
-              stroke="${col}" stroke-width="1" fill="none"/>
-        <line x1="10" y1="4.5" x2="10" y2="8" stroke="${col}" stroke-width="1"/>
-        <line x1="10" y1="12" x2="10" y2="15.5" stroke="${col}" stroke-width="1"/>
-        <line x1="4.5" y1="10" x2="8" y2="10" stroke="${col}" stroke-width="1"/>
-        <line x1="12" y1="10" x2="15.5" y2="10" stroke="${col}" stroke-width="1"/>
-        <circle cx="10" cy="10" r="2" fill="none" stroke="${col}" stroke-width="1"/>
-        <circle cx="10" cy="10" r="0.8" fill="${col}"/>
-      </svg>
-    </div>`,
-  })
-}
 
 // ── mkStrikeCluster — count badge for clustered strikes (low zoom) ──
 // Worst-status wins: if any DESTROYED in cluster → red, else DAMAGED → amber, else grey
@@ -81,29 +54,6 @@ function mkStrikeCluster(count, worstStatus) {
   })
 }
 
-// ── mkAirbaseMiniIcon — small airbase marker for country view map ──
-// Simplified version of MapView's mkAirbaseIcon — no count badge here;
-// country-view map is about the strike picture, airbases are context.
-function mkAirbaseMiniIcon(col=C.b) {
-  return L.divIcon({
-    className: '',
-    iconSize:   [16, 16],
-    iconAnchor: [8, 8],
-    html: `<svg viewBox="0 0 20 20" width="16" height="16" style="display:block;overflow:visible">
-      <rect x="5" y="5" width="10" height="10" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="1"/>
-      <circle cx="10" cy="10" r="1.2" fill="${col}"/>
-    </svg>`,
-  })
-}
-
-function mkNavalMiniIcon(col=C.b) {
-  return L.divIcon({
-    className: '',
-    iconSize: [30, 12],
-    iconAnchor: [15, 6],
-    html: `<div style="width:30px;height:12px;background:rgba(7,9,11,0.92);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:7px;font-weight:700;color:#dceaf0;letter-spacing:0.5px">NAV</div>`,
-  })
-}
 
 function TierGate({required,current,children}) {
   const TO={free:0,analyst:1,premium:2,admin:3,owner:4}
@@ -602,7 +552,7 @@ function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
         )}
         {airbases.map(a=>(
           <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]}
-            icon={mkAirbaseMiniIcon(a.status==='SURGE'?C.r:a.status==='ELEVATED'?C.a:C.g)}
+            icon={mkSiteIcon('airbase', a.status==='SURGE'?'DESTROYED':a.status==='ELEVATED'?'DAMAGED':'ACTIVE')}
             eventHandlers={{click:()=>navToBase(`/airbase/${(a.icao_code||a.id||'').toUpperCase()}`)}}>
             <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
               <span style={{...Z,fontSize:9,color:C.g}}>{(a.icao_code||'').toUpperCase()}</span>
@@ -611,7 +561,7 @@ function CountryMap({sites,assets,code,selSite,setSelSite,onExpand}) {
           </Marker>
         ))}
         {naval.map(a=>(
-          <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]} icon={mkNavalMiniIcon(C.b)}>
+          <Marker key={a.id} position={[parseFloat(a.lat),parseFloat(a.lng)]} icon={mkSiteIcon('naval', 'ACTIVE')}>
             <Tooltip direction="top" offset={[0,-8]} opacity={1} className="ow-tip">
               <span style={{...R,fontSize:11,fontWeight:600,color:C.tb}}>{a.name}</span>
             </Tooltip>

@@ -589,6 +589,7 @@ export function MapView({ auth }) {
   const [portAssets, setPortAssets] = useState([])
   const [pulseWindow, setPulseWindow] = useState('48h')
   const [selPulse, setSelPulse] = useState(null)
+  const [selSite,  setSelSite]  = useState(null)
 
   useEffect(()=>{ try{localStorage.setItem('ow_layers',JSON.stringify(layers))}catch{} },[layers])
 
@@ -626,8 +627,8 @@ export function MapView({ auth }) {
   const allAssets = [...allDbAssets,...dbExtras]
   const filtered  = allAssets.filter(a=>country==='ALL'||a.country?.trim()===country||a.type==='lmsr')
 
-  function selectAsset(a){ setSelAsset(a); setSelCor(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
-  function selectCoronet(c){ setSelCor(selCor?.id===c.id?null:c); setSelAsset(null) }
+  function selectAsset(a){ setSelAsset(a); setSelCor(null); setSelSite(null); setSelPulse(null); if(a.lat&&a.lng) setFlyTarget({center:[a.lat,a.lng],zoom:6}) }
+  function selectCoronet(c){ setSelCor(selCor?.id===c.id?null:c); setSelAsset(null); setSelSite(null); setSelPulse(null) }
 
   const naval    = filtered.filter(a=>['carrier','destroyer','submarine'].includes(a.type)).length
   const bases    = filtered.filter(a=>a.type==='airbase').length
@@ -666,9 +667,11 @@ function onEachFeature(feature,layer) {
     )
   }
 
+  const showRight = !!(selAsset || selCor || selPulse || selSite)
+
   return (
     <ErrorBoundary>
-    <div style={{flex:1,display:'grid',gridTemplateColumns:'260px 1fr 310px',overflow:'hidden'}}>
+    <div style={{flex:1,display:'grid',gridTemplateColumns:showRight?'260px 1fr 310px':'260px 1fr',overflow:'hidden'}}>
 
       {/* LEFT PANEL */}
       <div style={{background:C.bg2,borderRight:`1px solid ${C.br}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -855,7 +858,8 @@ function onEachFeature(feature,layer) {
           ))}
 
           {layers.strategic&&strategicSites.filter(s=>s.lat&&s.lng).map(s=>(
-            <Marker key={`strat-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_type, s.status)}>
+            <Marker key={`strat-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_type, s.status)}
+              eventHandlers={{click:()=>{setSelSite(s);setSelAsset(null);setSelCor(null);setSelPulse(null)}}}>
               <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:{DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g}[s.status]||C.t2}}>{s.site_type?.toUpperCase()||'STR'}</span>
                 <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
@@ -871,7 +875,8 @@ function onEachFeature(feature,layer) {
           ))}
 
           {layers.infrastructure&&infraSites.filter(s=>s.lat&&s.lng).map(s=>(
-            <Marker key={`infra-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_category, s.status)}>
+            <Marker key={`infra-${s.id}`} position={[parseFloat(s.lat),parseFloat(s.lng)]} icon={mkSiteIcon(s.site_category, s.status)}
+              eventHandlers={{click:()=>{setSelSite(s);setSelAsset(null);setSelCor(null);setSelPulse(null)}}}>
               <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.a}}>{s.site_category?.toUpperCase()||'INFRA'}</span>
                 <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
@@ -894,7 +899,7 @@ function onEachFeature(feature,layer) {
             if(!row.centroid_lat||!row.centroid_lng) return null
             return (
               <Marker key={`pulse-${row.country_code}`} position={[parseFloat(row.centroid_lat),parseFloat(row.centroid_lng)]} icon={mkPulseIcon(count,recency)}
-                eventHandlers={{click:()=>setSelPulse(row)}}>
+                eventHandlers={{click:()=>{setSelPulse(row);setSelAsset(null);setSelCor(null);setSelSite(null)}}}>
                 <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
                   <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:recency==='hot'?C.r:recency==='warm'?C.a:C.t2}}>{row.country_code}</span>
                   <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{count} strikes / {pulseWindow}</span>
@@ -903,14 +908,6 @@ function onEachFeature(feature,layer) {
             )
           })}
         </MapContainer>
-
-        {selPulse&&(
-          <StrikePulseSidebar
-            countryCode={selPulse.country_code}
-            pulseRow={selPulse}
-            onClose={()=>setSelPulse(null)}
-          />
-        )}
 
         {repositionAsset?(
           <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',zIndex:900,display:'flex',alignItems:'center',gap:10,background:'rgba(7,9,11,.96)',border:`2px solid ${C.a}`,padding:'8px 16px',backdropFilter:'blur(8px)',maxWidth:'90%'}}>
@@ -949,18 +946,48 @@ function onEachFeature(feature,layer) {
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
-      <div style={{background:C.bg2,borderLeft:`1px solid ${C.br}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        <PH title="Asset Detail" badge={selAsset?.name?.slice(0,18)||selCor?.callsign?.slice(0,14)||null} bc={C.t2} bb="transparent" />
-        <div style={{flex:1,overflowY:'auto'}}>
-          {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} auth={auth} onReposition={auth?.isAdmin?startReposition:null} />
-          : selCor   ? <CorDetail cor={selCor} />
-          : <EmptyDetail />}
+      {/* RIGHT PANEL — visible only when something is selected */}
+      {showRight&&(
+        <div style={{background:C.bg2,borderLeft:`1px solid ${C.br}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          {selPulse ? (
+            <StrikePulseSidebar countryCode={selPulse.country_code} pulseRow={selPulse} onClose={()=>setSelPulse(null)} />
+          ) : selSite ? (
+            <>
+              <PH title="Site Detail" badge={selSite.status} bc={{DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g}[selSite.status]||C.t2} bb="transparent" />
+              <div style={{flex:1,overflowY:'auto',padding:16,display:'flex',flexDirection:'column',gap:12}}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  <InlineIcon id={selSite.site_type||selSite.site_category||'facility'} status={selSite.status} size={32} />
+                  <div>
+                    <div style={{...R,fontSize:16,fontWeight:700,color:C.tb,lineHeight:1.2}}>{selSite.name}</div>
+                    <div style={{...Z,fontSize:9,color:C.t2,marginTop:3,letterSpacing:1}}>{(selSite.site_type||selSite.site_category||'').toUpperCase()}</div>
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <SBox value={selSite.status} label="STATUS" color={{DESTROYED:C.r,DAMAGED:C.a,ACTIVE:C.g}[selSite.status]||C.t2} />
+                  <SBox value={selSite.country_code||'—'} label="COUNTRY" color={C.b} />
+                </div>
+                {selSite.description&&<div style={{...Z,fontSize:9,color:C.t2,lineHeight:1.6,padding:'10px 12px',background:C.bg,border:`1px solid ${C.br}`,borderRadius:1}}>{selSite.description}</div>}
+                <button onClick={()=>navigate(`/country/${selSite.country_code}`)} style={{...R,fontSize:11,fontWeight:600,letterSpacing:1,padding:'6px 14px',background:'transparent',border:`1px solid ${C.b}`,color:C.b,cursor:'pointer',borderRadius:1,alignSelf:'flex-start'}}>→ COUNTRY VIEW</button>
+              </div>
+              <div style={{padding:'8px 12px',borderTop:`1px solid ${C.br}`,display:'flex',justifyContent:'flex-end'}}>
+                <button onClick={()=>setSelSite(null)} style={{...Z,fontSize:9,color:C.t2,background:'transparent',border:`1px solid ${C.br}`,padding:'4px 10px',cursor:'pointer'}}>✕ CLOSE</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <PH title="Asset Detail" badge={selAsset?.name?.slice(0,18)||selCor?.callsign?.slice(0,14)||null} bc={C.t2} bb="transparent" />
+              <div style={{flex:1,overflowY:'auto'}}>
+                {selAsset ? <ADetail asset={selAsset} onExpand={()=>setAbmAsset(selAsset)} flights={flights} navigate={navigate} auth={auth} onReposition={auth?.isAdmin?startReposition:null} />
+                : selCor   ? <CorDetail cor={selCor} />
+                : null}
+              </div>
+              <SigactPanel feeds={liveFeeds} selAsset={selAsset} />
+            </>
+          )}
         </div>
-        <SigactPanel feeds={liveFeeds} selAsset={selAsset} />
-      </div>
+      )}
 
-      <div style={{gridColumn:'1/4',height:24,background:C.bg4,borderTop:`1px solid ${C.br}`,display:'flex',alignItems:'center',padding:'0 14px',gap:16,flexShrink:0}}>
+      <div style={{gridColumn:showRight?'1/4':'1/3',height:24,background:C.bg4,borderTop:`1px solid ${C.br}`,display:'flex',alignItems:'center',padding:'0 14px',gap:16,flexShrink:0}}>
         {[{l:'NAVAL',v:naval,c:C.b},{l:'BASES',v:bases,c:C.g},{l:'LMSR',v:LMSR_DATA.length,c:C.y},{l:'AMC',v:loading?'…':flights.length,c:C.b}].map(({l,v,c})=>(
           <span key={l} style={{...Z,fontSize:10,color:C.t2}}>{l} <b style={{color:c,fontWeight:400}}>{v}</b></span>
         ))}

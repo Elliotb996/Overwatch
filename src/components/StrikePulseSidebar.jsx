@@ -37,11 +37,7 @@ export function StrikePulseSidebar({ countryCode, pulseRow, onClose }) {
   const recencyCol = totalCount > 0 ? C.r : C.a
 
   return (
-    <div style={{
-      position: 'absolute', right: 0, top: 0, bottom: 0, width: 320, zIndex: 1000,
-      background: C.bg2, borderLeft: `1px solid ${C.br}`,
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    }}>
+    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,

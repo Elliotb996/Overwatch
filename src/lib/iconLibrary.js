@@ -263,18 +263,13 @@ export const ICON_IDS = [
 // Returns a complete <svg> string with fills rendered correctly for any hex color.
 // state: 'nominal' | 'elevated' | 'critical' | 'dormant' — overrides color if provided.
 // destroyed: adds diagonal X overstrike (auto-applied when state='critical').
-export function renderSvgString(id, color, size = 32, { state = null, destroyed = false } = {}) {
+export function renderSvgString(id, color, size = 32, { state = null } = {}) {
   const glyph = GLYPHS[id]
   if (!glyph) return ''
   const col = color || STATE_COLORS[state] || STATE_COLORS.nominal
-  const isDestroyed = destroyed || state === 'critical'
-  const isDormant   = state === 'dormant'
-
+  const isDormant = state === 'dormant'
   const inner = isDormant ? `<g opacity="0.72">${glyph(col)}</g>` : glyph(col)
-  const xMark = isDestroyed
-    ? `<line x1="5"  y1="5"  x2="27" y2="27" stroke="${col}" stroke-width="1.4" stroke-linecap="square"/>
-       <line x1="27" y1="5"  x2="5"  y2="27" stroke="${col}" stroke-width="1.4" stroke-linecap="square"/>`
-    : ''
+  const xMark = ''
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="${size}" height="${size}" overflow="hidden" fill="none">${inner}${xMark}</svg>`
 }
@@ -283,9 +278,9 @@ export function renderSvgString(id, color, size = 32, { state = null, destroyed 
 // Returns the html string suitable for use in L.divIcon({ html: ... }).
 // Wrap in L.divIcon in mapIcons.js — iconLibrary stays Leaflet-free.
 // size: px dimension of the square icon. Alerts badge rendered externally.
-export function mkSiteIconHtml(id, color, size = 24, { state = null, destroyed = false } = {}) {
+export function mkSiteIconHtml(id, color, size = 24, { state = null } = {}) {
   const col = color || STATE_COLORS[state] || STATE_COLORS.nominal
-  const svg = renderSvgString(id, col, size, { state, destroyed })
+  const svg = renderSvgString(id, col, size, { state })
   const isPulse = state === 'critical'
   const pulseRing = isPulse
     ? `<span style="position:absolute;inset:1px;border:1px solid ${col};border-radius:50%;opacity:0.35;pointer-events:none;"></span>`
