@@ -264,7 +264,7 @@ export const ICON_IDS = [
 // state: 'nominal' | 'elevated' | 'critical' | 'dormant' — overrides color if provided.
 // destroyed: adds diagonal X overstrike (auto-applied when state='critical').
 export function renderSvgString(id, color, size = 32, { state = null } = {}) {
-  const glyph = GLYPHS[id]
+  const glyph = GLYPHS[(id || 'facility').toLowerCase()] || GLYPHS['facility']
   if (!glyph) return ''
   const col = color || STATE_COLORS[state] || STATE_COLORS.nominal
   const isDormant = state === 'dormant'
@@ -279,8 +279,9 @@ export function renderSvgString(id, color, size = 32, { state = null } = {}) {
 // Wrap in L.divIcon in mapIcons.js — iconLibrary stays Leaflet-free.
 // size: px dimension of the square icon. Alerts badge rendered externally.
 export function mkSiteIconHtml(id, color, size = 24, { state = null } = {}) {
+  const safeId = (id || 'facility').toLowerCase()
   const col = color || STATE_COLORS[state] || STATE_COLORS.nominal
-  const svg = renderSvgString(id, col, size, { state })
+  const svg = renderSvgString(safeId, col, size, { state })
   const isPulse = state === 'critical'
   const pulseRing = isPulse
     ? `<span style="position:absolute;inset:1px;border:1px solid ${col};border-radius:50%;opacity:0.35;pointer-events:none;"></span>`
@@ -292,9 +293,10 @@ export function mkSiteIconHtml(id, color, size = 24, { state = null } = {}) {
 // Renders the currentColor SVG for any icon ID in a fixed-size div.
 // Set `status` to drive color from STATE_COLORS (defaults to nominal green).
 export function InlineIcon({ id, status, size = 16 }) {
+  const safeId = (id || 'facility').toLowerCase()
   const col = STATE_COLORS[status] || STATE_COLORS.nominal
   return React.createElement('div', {
-    dangerouslySetInnerHTML: { __html: SITE_ICONS[id] || SITE_ICONS['facility'] },
+    dangerouslySetInnerHTML: { __html: SITE_ICONS[safeId] || SITE_ICONS['facility'] },
     style: { width: size, height: size, flexShrink: 0, color: col, lineHeight: 0, display: 'inline-block' },
   })
 }

@@ -472,7 +472,7 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
                 const pos = positions[i] || {lat:cl.lat, lng:cl.lng}
                 return (
                   <Marker key={s.id} position={[pos.lat, pos.lng]}
-                    icon={mkSiteIcon(s.site_category || s.site_type, s.status)}
+                    icon={mkSiteIcon(s.site_type || s.site_category, s.status)}
                     eventHandlers={{click:(e)=>{
                       L.DomEvent.stopPropagation(e)
                       setSelSite(selSite?.id === s.id ? null : s)
@@ -513,7 +513,7 @@ function SingleSiteMarker({site, selSite, setSelSite, onExpand}) {
   const col = SITE_STATUS_COL[site.status] || C.t2
   return (
     <Marker position={[parseFloat(site.lat), parseFloat(site.lng)]}
-      icon={mkSiteIcon(site.site_category || site.site_type, site.status)}
+      icon={mkSiteIcon(site.site_type || site.site_category, site.status)}
       eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setSelSite(isSel ? null : site)}}}>
       <Tooltip direction="top" offset={[0,-12]} opacity={1} className="ow-tip">
         <span style={{...Z,fontSize:9,color:col,letterSpacing:1,display:'inline-flex',alignItems:'center'}}><InlineIcon id={site.site_type} status={site.status} size={12} /></span>

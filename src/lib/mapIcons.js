@@ -9,9 +9,10 @@ const _statusToState = { ACTIVE:'nominal', DAMAGED:'elevated', DESTROYED:'critic
 // status: ACTIVE | DAMAGED | DESTROYED | UNKNOWN
 // alerts: integer badge count (0 = no badge)
 export function mkSiteIcon(iconId, status, alerts = 0) {
+  const safeId = (iconId || 'facility').toLowerCase()
   const state = _statusToState[status] || 'dormant'
   const color = STATE_COLORS[state]
-  const id    = SITE_ICON_META[iconId] ? iconId : 'facility'
+  const id    = SITE_ICON_META[safeId] ? safeId : 'facility'
   const badge = alerts > 0
     ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${color};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
     : ''

@@ -14,11 +14,13 @@ const STATUS_COL = { DESTROYED: C.r, DAMAGED: C.a, ACTIVE: C.g, UNKNOWN: C.t2 }
 export function StrikePulseSidebar({ countryCode, pulseRow, onClose }) {
   const [sites, setSites] = useState([])
   const [loading, setLoading] = useState(true)
+  const [countryName, setCountryName] = useState(countryCode)
 
   useEffect(() => {
     if (!countryCode) return
     setLoading(true)
     setSites([])
+    setCountryName(countryCode)
     supabase
       .from('strike_sites')
       .select('id,name,site_type,site_category,status,strike_date,source,geo_confirmed')
@@ -29,6 +31,12 @@ export function StrikePulseSidebar({ countryCode, pulseRow, onClose }) {
         setSites(data || [])
         setLoading(false)
       })
+    supabase
+      .from('country_intel')
+      .select('name')
+      .eq('code', countryCode)
+      .single()
+      .then(({ data }) => { if (data?.name) setCountryName(data.name) })
   }, [countryCode])
 
   const totalCount = pulseRow
@@ -49,7 +57,7 @@ export function StrikePulseSidebar({ countryCode, pulseRow, onClose }) {
             STRIKE PULSE
           </div>
           <div style={{ ...R, fontSize: 16, fontWeight: 700, color: C.tb, letterSpacing: 1 }}>
-            {countryCode}
+            {countryName.toUpperCase()}
           </div>
         </div>
         {pulseRow && (
