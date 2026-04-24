@@ -197,7 +197,7 @@ export function CountryView({auth}) {
 
   const esc = ESC_COLORS[intel?.escalation||'WATCH']
   const hasStrikeSites = intel?.has_strike_sites === true && sites.length > 0
-  const tabs = ['OVERVIEW', ...(hasStrikeSites?['STRIKE SITES']:[]), 'ASSETS', 'FLIGHTS', 'IMAGERY']
+  const tabs = ['OVERVIEW', ...(hasStrikeSites?['STRIKE SITES']:[]), 'ASSETS', ...(intel?.country_type === 'hostile' ? [] : ['FLIGHTS']), 'IMAGERY']
 
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:C.bg}}>
@@ -236,7 +236,7 @@ export function CountryView({auth}) {
       </div>
 
       <div style={{flex:1,overflow:'hidden',display:'flex'}}>
-        {tab==='OVERVIEW'&&<OverviewTab intel={intel} sites={sites} assets={assets} flights={flights} auth={auth} navigate={navigate} hasStrikeSites={hasStrikeSites} code={code} selSite={selSite} setSelSite={setSelSite} onExpandSite={(s)=>{setSelSite(s);setTab('STRIKE SITES')}} />}
+        {tab==='OVERVIEW'&&<OverviewTab intel={intel} sites={sites} assets={assets} flights={flights} auth={auth} navigate={navigate} hasStrikeSites={hasStrikeSites} code={code} selSite={selSite} setSelSite={setSelSite} onExpandSite={(s)=>{setSelSite(s);setTab('STRIKE SITES')}} cType={intel?.country_type||'neutral'} />}
         {tab==='STRIKE SITES'&&<StrikeSitesTab sites={sites} auth={auth} selSite={selSite} setSelSite={setSelSite} code={code} siteListRef={siteListRef} />}
         {tab==='ASSETS'&&<AssetsTab assets={assets} auth={auth} navigate={navigate} />}
         {tab==='FLIGHTS'&&<FlightsTab flights={flights} auth={auth} />}
@@ -249,7 +249,7 @@ export function CountryView({auth}) {
 // ── OverviewTab ──
 // Layout: 38% left (intel journal + stats) | 62% right (map + site preview).
 // Map fills its panel. Stats are 2-col. Intel is a dated journal.
-function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,code,selSite,setSelSite,onExpandSite}) {
+function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,code,selSite,setSelSite,onExpandSite,cType}) {
   const airbases = assets.filter(a=>a.asset_type==='airbase')
   const naval = assets.filter(a=>['carrier','destroyer','submarine'].includes(a.asset_type))
   const journal = parseIntelJournal(intel?.notes)
@@ -272,10 +272,12 @@ function OverviewTab({intel,sites,assets,flights,auth,navigate,hasStrikeSites,co
         <div style={{...Z,fontSize:9,letterSpacing:3,color:C.t3,marginTop:18,marginBottom:10}}>QUICK STATS</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
           {[
-            {v:flights.length,l:'AMC FLIGHTS',c:C.b},
+            ...(cType==='hostile'?[]:[
+              {v:flights.length,l:'AMC FLIGHTS',c:C.b},
+              {v:flights.filter(f=>f.mc_flag==='socom').length,l:'SOCOM',c:C.p},
+            ]),
             {v:hasStrikeSites?sites.length:0,l:'STRIKE SITES',c:C.r},
             {v:airbases.length,l:'AIRBASES',c:C.g},
-            {v:flights.filter(f=>f.mc_flag==='socom').length,l:'SOCOM',c:C.p},
             {v:naval.length,l:'NAVAL',c:C.b},
             {v:hasStrikeSites?sites.filter(s=>s.status==='DESTROYED').length:0,l:'DESTROYED',c:C.r},
           ].map(({v,l,c})=>(
