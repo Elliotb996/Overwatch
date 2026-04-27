@@ -13,14 +13,17 @@ export function mkSiteIcon(iconId, status, alerts = 0) {
   const state = _statusToState[status] || 'dormant'
   const color = STATE_COLORS[state]
   const id    = SITE_ICON_META[safeId] ? safeId : 'facility'
+  let finalColor = color
+  if (id === 'airbase') finalColor = '#39e0a0'
+  if (id === 'naval' || id === 'port') finalColor = '#50a0e8'
   const badge = alerts > 0
-    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${color};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
+    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${finalColor};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
     : ''
   return L.divIcon({
     className: '',
     iconSize:  [22, 22],
     iconAnchor:[11, 11],
-    html: `<div style="position:relative;display:inline-block;width:22px;height:22px;">${mkSiteIconHtml(id, color, 22, { state })}${badge}</div>`,
+    html: `<div style="position:relative;display:inline-block;width:22px;height:22px;">${mkSiteIconHtml(id, finalColor, 22, { state })}${badge}</div>`,
   })
 }
 

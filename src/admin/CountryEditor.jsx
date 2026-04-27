@@ -12,7 +12,8 @@ const C={
   y:'#e8d040',t1:'#b8ccd8',t2:'#4a6070',t3:'#28404c',tb:'#dceaf0',
   bg:'#07090b',bg2:'#0c1018',bg3:'#101620',bg4:'#161e28',br:'#1e2c3a',
 }
-const ESC_OPTIONS=['CRITICAL','HIGH','ELEVATED','SURGE','MODERATE','ACTIVE','WATCH']
+const ESC_OPTIONS=['WATCH','ELEVATED','HIGH','CRITICAL']
+const TYPE_OPTIONS=['hostile','allied_host','allied_non_host','neutral','partner']
 const ESC_COL={CRITICAL:C.r,HIGH:C.a,ELEVATED:C.y,SURGE:C.r,MODERATE:C.b,ACTIVE:C.b,WATCH:C.t2}
 
 const COUNTRY_DEFAULTS=[
@@ -140,7 +141,7 @@ export function CountryEditor() {
     // Merge with defaults so all countries show
     const existing = c||[]
     const merged = COUNTRY_DEFAULTS.map(d=>{
-      return existing.find(e=>e.code===d.code) || {...d, escalation:'WATCH', summary:'', threat_window:'', has_strike_sites:false, has_ports:false}
+      return existing.find(e=>e.code===d.code) || {...d, escalation:'WATCH', country_type:'neutral', summary:'', threat_window:'', has_strike_sites:false, has_ports:false}
     })
     // Add any DB countries not in defaults
     existing.filter(e=>!COUNTRY_DEFAULTS.find(d=>d.code===e.code)).forEach(e=>merged.push(e))
@@ -155,6 +156,7 @@ export function CountryEditor() {
     const payload={
       code:country.code, name:country.name,
       escalation:country.escalation||'WATCH',
+      country_type:country.country_type||'neutral',
       summary:country.summary||'',
       threat_window:country.threat_window||'',
       notes:country.notes||'',
@@ -274,29 +276,41 @@ export function CountryEditor() {
             <div style={{...Z,fontSize:10,color:C.t3}}>{country.code}</div>
           </div>
 
-          {/* Escalation */}
-          <div style={{marginBottom:16}}>
-            <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>ESCALATION LEVEL</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {ESC_OPTIONS.map(e=>{
-                const col=ESC_COL[e]||C.t2
-                const sel=country.escalation===e
-                return (
-                  <button key={e} onClick={()=>setEditingCountry(c=>({...c,escalation:e}))}
-                    style={{...R,fontSize:12,fontWeight:700,padding:'5px 14px',cursor:'pointer',letterSpacing:1,
-                      color:sel?C.bg:col,background:sel?col:'transparent',
-                      border:`1px solid ${col}`,borderRadius:1}}>
-                    {e}
-                  </button>
-                )
-              })}
+          {/* Escalation + Country Type */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+            <div>
+              <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>ESCALATION LEVEL</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {ESC_OPTIONS.map(e=>{
+                  const col=ESC_COL[e]||C.t2
+                  const sel=country.escalation===e
+                  return (
+                    <button key={e} onClick={()=>setEditingCountry(c=>({...c,escalation:e}))}
+                      style={{...R,fontSize:12,fontWeight:700,padding:'5px 14px',cursor:'pointer',letterSpacing:1,
+                        color:sel?C.bg:col,background:sel?col:'transparent',
+                        border:`1px solid ${col}`,borderRadius:1}}>
+                      {e}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
+              <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>COUNTRY TYPE</div>
+              <select value={country.country_type||'neutral'} onChange={e=>setEditingCountry(c=>({...c,country_type:e.target.value}))}
+                style={{width:'100%',padding:'8px 10px',background:C.bg2,border:`1px solid ${C.br}`,color:C.t1,...Z,fontSize:11,borderRadius:1,outline:'none',cursor:'pointer'}}>
+                {TYPE_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
           </div>
 
-          {/* Toggles */}
-          <div style={{display:'flex',gap:24,marginBottom:20,padding:'12px 16px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
-            <Toggle on={!!country.has_strike_sites} label="STRIKE SITES" onClick={()=>setEditingCountry(c=>({...c,has_strike_sites:!c.has_strike_sites}))} />
-            <Toggle on={!!country.has_ports} label="PORTS/NAVAL" onClick={()=>setEditingCountry(c=>({...c,has_ports:!c.has_ports}))} />
+          {/* Toggles — legacy manual tab overrides */}
+          <div style={{opacity:0.5,marginBottom:20}}>
+            <div style={{...Z,fontSize:9,letterSpacing:2,color:C.t3,marginBottom:8}}>LEGACY MANUAL TAB OVERRIDES</div>
+            <div style={{display:'flex',gap:24,padding:'12px 16px',background:C.bg3,border:`1px solid ${C.br}`,borderRadius:1}}>
+              <Toggle on={!!country.has_strike_sites} label="STRIKE SITES" onClick={()=>setEditingCountry(c=>({...c,has_strike_sites:!c.has_strike_sites}))} />
+              <Toggle on={!!country.has_ports} label="PORTS/NAVAL" onClick={()=>setEditingCountry(c=>({...c,has_ports:!c.has_ports}))} />
+            </div>
           </div>
 
           {/* Threat window */}
