@@ -428,6 +428,7 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
   const clusters = computeSiteClusters(valid, map)
   return (
     <>
+      {expandedId && <style>{'.leaflet-marker-icon:not(.focused-cluster-item) { opacity: 0.25 !important; filter: grayscale(100%); transition: all 0.3s; pointer-events: none; }'}</style>}
       {clusters.map(cl => {
         if(cl.sites.length === 1) {
           return <SingleSiteMarker key={cl.id} site={cl.sites[0]} selSite={selSite} setSelSite={setSelSite} onExpand={onExpand} />
@@ -441,13 +442,15 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
           return (
             <div key={cl.id}>
               <Marker position={[cl.lat, cl.lng]}
-                icon={mkSiteIcon(cl.sites[0]?.site_type || cl.sites[0]?.site_category || 'facility', worst, cl.sites.length)}
+                icon={mkSiteIcon(cl.sites[0]?.site_type || cl.sites[0]?.site_category || 'facility', worst, { clusterCount: cl.sites.length, className: 'focused-cluster-item' })}
+                zIndexOffset={10000}
                 eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setExpandedId(null)}}} />
               {cl.sites.map((s, i) => {
                 const pos = positions[i] || {lat:cl.lat, lng:cl.lng}
                 return (
                   <Marker key={s.id} position={[pos.lat, pos.lng]}
-                    icon={mkSiteIcon(s.site_type || s.site_category, s.status)}
+                    icon={mkSiteIcon(s.site_type || s.site_category, s.status, { className: 'focused-cluster-item' })}
+                    zIndexOffset={10000}
                     eventHandlers={{click:(e)=>{
                       L.DomEvent.stopPropagation(e)
                       setSelSite(selSite?.id === s.id ? null : s)
@@ -465,7 +468,7 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
 
         return (
           <Marker key={cl.id} position={[cl.lat, cl.lng]}
-            icon={mkSiteIcon(cl.sites[0]?.site_type || cl.sites[0]?.site_category || 'facility', worst, cl.sites.length)}
+            icon={mkSiteIcon(cl.sites[0]?.site_type || cl.sites[0]?.site_category || 'facility', worst, { clusterCount: cl.sites.length })}
             eventHandlers={{click:(e)=>{
               L.DomEvent.stopPropagation(e)
               const pos = getSiteFanPositions(cl.lat, cl.lng, cl.sites.length, map)

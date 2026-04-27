@@ -373,6 +373,7 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
     const clusters = computeClusters(filtered, map)
     return (
       <>
+        {expandedId && <style>{'.leaflet-marker-icon:not(.focused-cluster-item) { opacity: 0.25 !important; filter: grayscale(100%); transition: all 0.3s; pointer-events: none; }'}</style>}
         {clusters.map(cl => {
           const isExpanded = expandedId === cl.id
           const maxStatus = cl.assets.find(a => a.status === 'SURGE') ? 'SURGE'
@@ -391,7 +392,8 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
               <React.Fragment key={cl.id}>
                 {/* Ghost centre marker */}
                 <Marker position={[cl.lat, cl.lng]}
-                  icon={mkSiteIcon('airbase', maxStatus || 'ACTIVE', cl.assets.length)}
+                  icon={mkSiteIcon('airbase', maxStatus || 'ACTIVE', { clusterCount: cl.assets.length, className: 'focused-cluster-item' })}
+                  zIndexOffset={10000}
                   eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); setExpandedId(null) } }} />
                 {/* Spread markers */}
                 {cl.assets.map((a, i) => {
@@ -403,7 +405,8 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
                   ).length
                   return (
                     <Marker key={a.id} position={[pos.lat, pos.lng]}
-                      icon={mkSiteIcon('airbase', a.status, arrivals7d || a.arrCnt || 0)}
+                      icon={mkSiteIcon('airbase', a.status, { flightCount: arrivals7d || a.arrCnt || 0, className: 'focused-cluster-item' })}
+                      zIndexOffset={10000}
                       eventHandlers={{ click: (e) => {
                         L.DomEvent.stopPropagation(e)
                         selectAsset(a)
@@ -427,7 +430,7 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
           // Collapsed cluster — single multi-base marker
           return (
             <Marker key={cl.id} position={[cl.lat, cl.lng]}
-              icon={mkSiteIcon('airbase', maxStatus || 'ACTIVE', cl.assets.length)}
+              icon={mkSiteIcon('airbase', maxStatus || 'ACTIVE', { clusterCount: cl.assets.length })}
               eventHandlers={{ click: (e) => {
                 L.DomEvent.stopPropagation(e)
                 if (CLUSTER_MODE === 'zoom') {
@@ -478,7 +481,7 @@ function SingleAirbaseMarker({ a, flights, selectAsset, setAbmAsset }) {
 
   return (
     <Marker position={[a.lat, a.lng]}
-      icon={mkSiteIcon('airbase', a.status, arrivals7d || a.arrCnt || 0)}
+      icon={mkSiteIcon('airbase', a.status, { flightCount: arrivals7d || a.arrCnt || 0 })}
       zIndexOffset={1000}
       eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); selectAsset(a) } }}>
       <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip" permanent={false}>
