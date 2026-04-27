@@ -54,17 +54,6 @@ export function mkIcon(sym, color, size = 18, badge = null) {
   })
 }
 
-// label: full hull e.g. "CVN-78", "DDG-51", "T-AK-304". Width scales to text length.
-export function mkTrackBlock(label, color) {
-  const w = Math.min(Math.max(label.length * 6 + 10, 34), 58)
-  return L.divIcon({
-    className: '',
-    iconSize:   [w, 14],
-    iconAnchor: [w / 2, 7],
-    html: `<div style="width:${w}px;height:14px;background:rgba(7,9,11,0.92);border:1px solid ${color};display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;color:#dceaf0;box-sizing:border-box;overflow:hidden;white-space:nowrap;letter-spacing:0.3px;">${label}</div>`,
-  })
-}
-
 // Crosshair-in-square: strategic strike sites. Color-coded by status.
 export function mkStrikeMapIcon(status = 'ACTIVE') {
   const col = { DESTROYED: '#e85040', DAMAGED: '#f0a040', ACTIVE: '#39e0a0', UNKNOWN: '#4a6070' }[status] || '#4a6070'

@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
-import { mkIcon, mkTrackBlock, mkSiteIcon, mkPulseIcon, PULSE_COLS } from '../lib/mapIcons'
+import { mkIcon, mkSiteIcon, mkPulseIcon, PULSE_COLS } from '../lib/mapIcons'
 import { InlineIcon } from '../lib/iconLibrary'
 import { StrikePulseSidebar } from '../components/StrikePulseSidebar'
 
@@ -767,7 +767,7 @@ function onEachFeature(feature,layer) {
 
           {repositionAsset&&repositionPos&&(
             <Marker position={[repositionPos.lat,repositionPos.lng]} draggable={true}
-              icon={mkTrackBlock('REPOS',C.a)}
+              icon={mkIcon('⊕',C.a,22)}
               eventHandlers={{dragend:(e)=>{const p=e.target.getLatLng();setRepositionPos({lat:p.lat,lng:p.lng})}}} />
           )}
 
@@ -800,62 +800,53 @@ function onEachFeature(feature,layer) {
             )
           })}
 
-          {layers.carriers && allAssets.filter(a => a.type === 'carrier' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
-            const col = a.status === 'REFIT' ? C.t3 : a.status === 'SURGE' ? C.r : C.b
-            const label = (a.hull || a.sub?.split('//')[0]?.trim() || a.id).trim()
-            return (
-              <Marker key={a.id} position={[a.lat, a.lng]}
-                icon={mkTrackBlock(label, col)}
-                eventHandlers={{click: () => selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
-                </Tooltip>
-              </Marker>
-            )
-          })}
-          {layers.destroyers && allAssets.filter(a => a.type === 'destroyer' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
-            const label = (a.hull || a.sub?.split('//')[0]?.trim() || a.id).trim()
-            return (
-              <Marker key={a.id} position={[a.lat, a.lng]}
-                icon={mkTrackBlock(label, C.b)}
-                eventHandlers={{click: () => selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
-                </Tooltip>
-              </Marker>
-            )
-          })}
-          {layers.subs && allAssets.filter(a => a.type === 'submarine' && a.lat != null && a.lng != null && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => {
-            const label = (a.hull || a.sub?.split('//')[0]?.trim() || a.id).trim()
-            return (
-              <Marker key={a.id} position={[a.lat, a.lng]}
-                icon={mkTrackBlock(label, C.p)}
-                eventHandlers={{click: () => selectAsset(a)}}>
-                <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{a.name}</span>
-                </Tooltip>
-              </Marker>
-            )
-          })}
-          {layers.lmsr&&LMSR_DATA.filter(s=>s.lat!=null&&s.lng!=null&&repositionAsset?.id!==s.id).map(s=>{
-            const col=s.cat==='forward'?C.y:s.cat==='conus_e'?C.b:C.t2
-            return (
-              <Marker key={s.id} position={[s.lat,s.lng]}
-                icon={mkTrackBlock((s.hull||s.id||'').trim(), col)}
-                eventHandlers={{click:()=>selectAsset({...s,type:'lmsr'})}}>
-                <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
-                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0'}}>{s.name}</span>
-                </Tooltip>
-                <Popup closeButton={false}>
-                  <div style={{...Z,fontSize:11}}>
-                    <div style={{...R,fontSize:13,fontWeight:700,color:C.tb}}>{s.name}</div>
-                    <div style={{color:s.centcom==='CRITICAL'?C.r:s.centcom==='HIGH'?C.a:C.t2,marginTop:3}}>{s.centcom}</div>
-                    <div style={{color:C.t2,fontSize:10,marginTop:2}}>{s.loc}</div>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          })}
+          {layers.carriers && allAssets.filter(a => a.type === 'carrier' && a.lat != null && a.lng != null && !a.docked_at && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => (
+            <Marker key={a.id} position={[a.lat, a.lng]}
+              icon={mkSiteIcon(a.type || 'naval', a.status || 'ACTIVE')}
+              eventHandlers={{click: () => selectAsset(a)}}>
+              <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.b}}>{a.hull_number || a.hull || a.sub?.split('//')[0]?.trim()}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0',marginLeft:6}}>{a.name}</span>
+              </Tooltip>
+            </Marker>
+          ))}
+          {layers.destroyers && allAssets.filter(a => a.type === 'destroyer' && a.lat != null && a.lng != null && !a.docked_at && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => (
+            <Marker key={a.id} position={[a.lat, a.lng]}
+              icon={mkSiteIcon(a.type || 'naval', a.status || 'ACTIVE')}
+              eventHandlers={{click: () => selectAsset(a)}}>
+              <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.b}}>{a.hull_number || a.hull || a.sub?.split('//')[0]?.trim()}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0',marginLeft:6}}>{a.name}</span>
+              </Tooltip>
+            </Marker>
+          ))}
+          {layers.subs && allAssets.filter(a => a.type === 'submarine' && a.lat != null && a.lng != null && !a.docked_at && (country === 'ALL' || a.country?.trim() === country) && repositionAsset?.id !== a.id).map(a => (
+            <Marker key={a.id} position={[a.lat, a.lng]}
+              icon={mkSiteIcon(a.type || 'naval', a.status || 'ACTIVE')}
+              eventHandlers={{click: () => selectAsset(a)}}>
+              <Tooltip direction="top" offset={[0, -10]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.p}}>{a.hull_number || a.hull || a.sub?.split('//')[0]?.trim()}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0',marginLeft:6}}>{a.name}</span>
+              </Tooltip>
+            </Marker>
+          ))}
+          {layers.lmsr&&LMSR_DATA.filter(s=>s.lat!=null&&s.lng!=null&&!s.docked_at&&repositionAsset?.id!==s.id).map(s=>(
+            <Marker key={s.id} position={[s.lat,s.lng]}
+              icon={mkSiteIcon('naval', 'ACTIVE')}
+              eventHandlers={{click:()=>selectAsset({...s,type:'lmsr'})}}>
+              <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip">
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:C.y}}>{(s.hull||s.id||'').trim()}</span>
+                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,fontWeight:700,color:'#dceaf0',marginLeft:6}}>{s.name}</span>
+              </Tooltip>
+              <Popup closeButton={false}>
+                <div style={{...Z,fontSize:11}}>
+                  <div style={{...R,fontSize:13,fontWeight:700,color:C.tb}}>{s.name}</div>
+                  <div style={{color:s.centcom==='CRITICAL'?C.r:s.centcom==='HIGH'?C.a:C.t2,marginTop:3}}>{s.centcom}</div>
+                  <div style={{color:C.t2,fontSize:10,marginTop:2}}>{s.loc}</div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
           {layers.strikes&&allAssets.filter(a=>a.type==='strike'&&a.lat!=null&&a.lng!=null&&(country==='ALL'||a.country?.trim()===country)).map(a=>(
             <Marker key={a.id} position={[a.lat,a.lng]} icon={mkIcon('EV',C.r,16)} eventHandlers={{click:()=>selectAsset(a)}} />
           ))}
@@ -887,14 +878,17 @@ function onEachFeature(feature,layer) {
             </Marker>
           ))}
 
-          {layers.ports&&portAssets.filter(p=>p.lat&&p.lng).map(p=>(
-            <Marker key={`port-${p.id}`} position={[parseFloat(p.lat),parseFloat(p.lng)]} icon={mkSiteIcon('port', p.status||'ACTIVE')}>
-              <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
-                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'#20c0a0'}}>{p.port_category?.toUpperCase()||'PORT'}</span>
-                <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{p.name}</span>
-              </Tooltip>
-            </Marker>
-          ))}
+          {layers.ports&&portAssets.filter(p=>p.lat&&p.lng).map(p=>{
+            const dockedCount = allAssets.filter(a => a.docked_at === p.id).length
+            return (
+              <Marker key={`port-${p.id}`} position={[parseFloat(p.lat),parseFloat(p.lng)]} icon={mkSiteIcon('port', p.status||'ACTIVE', { clusterCount: dockedCount })}>
+                <Tooltip direction="top" offset={[0,-10]} opacity={1} className="ow-tip">
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'#20c0a0'}}>{p.port_category?.toUpperCase()||'PORT'}</span>
+                  <span style={{fontFamily:"'Rajdhani',sans-serif",fontSize:11,fontWeight:600,color:'#dceaf0',marginLeft:6}}>{p.name}</span>
+                </Tooltip>
+              </Marker>
+            )
+          })}
 
           {layers.strikePulse&&strikePulseData.filter(row=>(row[PULSE_COLS[pulseWindow]]||0)>0).map(row=>{
             const count=row[PULSE_COLS[pulseWindow]]||0
