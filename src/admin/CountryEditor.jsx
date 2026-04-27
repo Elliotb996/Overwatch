@@ -12,9 +12,9 @@ const C={
   y:'#e8d040',t1:'#b8ccd8',t2:'#4a6070',t3:'#28404c',tb:'#dceaf0',
   bg:'#07090b',bg2:'#0c1018',bg3:'#101620',bg4:'#161e28',br:'#1e2c3a',
 }
-const ESC_OPTIONS=['WATCH','ELEVATED','HIGH','CRITICAL']
+const ESC_OPTIONS=['NORMAL','ELEVATED','HIGH','CRITICAL']
 const TYPE_OPTIONS=['hostile','allied_host','allied_non_host','neutral','partner']
-const ESC_COL={CRITICAL:C.r,HIGH:C.a,ELEVATED:C.y,SURGE:C.r,MODERATE:C.b,ACTIVE:C.b,WATCH:C.t2}
+const ESC_COL={CRITICAL:C.r,HIGH:C.a,ELEVATED:C.y,NORMAL:C.t2}
 
 const COUNTRY_DEFAULTS=[
   {code:'IR',name:'Iran'},{code:'JO',name:'Jordan'},{code:'IL',name:'Israel'},
@@ -141,7 +141,7 @@ export function CountryEditor() {
     // Merge with defaults so all countries show
     const existing = c||[]
     const merged = COUNTRY_DEFAULTS.map(d=>{
-      return existing.find(e=>e.code===d.code) || {...d, escalation:'WATCH', country_type:'neutral', summary:'', threat_window:'', has_strike_sites:false, has_ports:false}
+      return existing.find(e=>e.code===d.code) || {...d, escalation:'NORMAL', country_type:'neutral', summary:'', threat_window:'', has_strike_sites:false, has_ports:false}
     })
     // Add any DB countries not in defaults
     existing.filter(e=>!COUNTRY_DEFAULTS.find(d=>d.code===e.code)).forEach(e=>merged.push(e))

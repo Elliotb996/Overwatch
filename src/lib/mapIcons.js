@@ -62,35 +62,6 @@ export function mkTrackBlock(label, color) {
   })
 }
 
-// Static SVG replica of AirbaseMarker.jsx — required for Leaflet divIcon (no React hooks).
-// Status mapping: SURGE→red, ELEVATED→amber, ACTIVE→green, MODERATE→blue, else→slate
-export function mkAirbaseIcon(status, alerts = 0) {
-  const cfg = {
-    SURGE:    { color: '#e85040', fill: 'rgba(232,80,64,0.10)'  },
-    ELEVATED: { color: '#f0a040', fill: 'rgba(240,160,64,0.08)' },
-    ACTIVE:   { color: '#39e0a0', fill: 'rgba(57,224,160,0.08)' },
-    MODERATE: { color: '#50a0e8', fill: 'rgba(80,160,232,0.08)' },
-  }
-  const { color, fill } = cfg[status] || { color: '#4a6070', fill: 'transparent' }
-  const badge = alerts > 0
-    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${color};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
-    : ''
-  return L.divIcon({
-    className: '',
-    iconSize:   [20, 20],
-    iconAnchor: [10, 10],
-    html: `<div style="position:relative;width:20px;height:20px">
-      <svg viewBox="0 0 20 20" width="20" height="20" style="display:block;overflow:visible">
-        <rect x="4" y="4" width="12" height="12" fill="${fill}" stroke="${color}" stroke-width="1"/>
-        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
-              stroke="${color}" stroke-width="1" fill="none"/>
-        <circle cx="10" cy="10" r="1.6" fill="${color}"/>
-      </svg>
-      ${badge}
-    </div>`,
-  })
-}
-
 // Crosshair-in-square: strategic strike sites. Color-coded by status.
 export function mkStrikeMapIcon(status = 'ACTIVE') {
   const col = { DESTROYED: '#e85040', DAMAGED: '#f0a040', ACTIVE: '#39e0a0', UNKNOWN: '#4a6070' }[status] || '#4a6070'

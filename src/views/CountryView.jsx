@@ -21,7 +21,7 @@ const ESC_COLORS = {
   SURGE:   {c:'#e85040',bg:'rgba(232,80,64,.15)', border:'rgba(232,80,64,.4)'},
   MODERATE:{c:'#50a0e8',bg:'rgba(80,160,232,.1)', border:'rgba(80,160,232,.3)'},
   ACTIVE:  {c:'#50a0e8',bg:'rgba(80,160,232,.1)', border:'rgba(80,160,232,.3)'},
-  WATCH:   {c:'#4a6070',bg:'rgba(74,96,112,.1)',  border:'rgba(74,96,112,.3)'},
+  NORMAL:  {c:'#4a6070',bg:'rgba(74,96,112,.1)',  border:'rgba(74,96,112,.3)'},
 }
 
 // Strike site status → colour. Drives both icon border and list tag.
@@ -195,7 +195,7 @@ export function CountryView({auth}) {
     </div>
   )
 
-  const esc = ESC_COLORS[intel?.escalation||'WATCH']
+  const esc = ESC_COLORS[intel?.escalation||'NORMAL']
   const hasStrikeSites = intel?.has_strike_sites === true && sites.length > 0
   const tabs = ['OVERVIEW', ...(hasStrikeSites?['STRIKE SITES']:[]), 'ASSETS', ...(intel?.country_type === 'hostile' ? [] : ['FLIGHTS']), 'IMAGERY']
 

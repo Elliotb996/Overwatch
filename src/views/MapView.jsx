@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
-import { mkIcon, mkTrackBlock, mkAirbaseIcon, mkSiteIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
+import { mkIcon, mkTrackBlock, mkSiteIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
 import { InlineIcon } from '../lib/iconLibrary'
 import { StrikePulseSidebar } from '../components/StrikePulseSidebar'
 
@@ -90,7 +90,7 @@ const ESC_GEO = {
   ELEVATED:{ color:'#e8d040' },
   ACTIVE:  { color:'#50a0e8' },
   MODERATE:{ color:'#50a0e8' },
-  WATCH:   { color:'#4a6070' },
+  NORMAL:  { color:'#4a6070' },
 }
 
 const VIEWS = {
@@ -403,7 +403,7 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
                   ).length
                   return (
                     <Marker key={a.id} position={[pos.lat, pos.lng]}
-                      icon={mkAirbaseIcon(a.status, arrivals7d || a.arrCnt || 0)}
+                      icon={mkSiteIcon('airbase', a.status, arrivals7d || a.arrCnt || 0)}
                       eventHandlers={{ click: (e) => {
                         L.DomEvent.stopPropagation(e)
                         selectAsset(a)
@@ -478,7 +478,7 @@ function SingleAirbaseMarker({ a, flights, selectAsset, setAbmAsset }) {
 
   return (
     <Marker position={[a.lat, a.lng]}
-      icon={mkAirbaseIcon(a.status, arrivals7d || a.arrCnt || 0)}
+      icon={mkSiteIcon('airbase', a.status, arrivals7d || a.arrCnt || 0)}
       zIndexOffset={1000}
       eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); selectAsset(a) } }}>
       <Tooltip direction="top" offset={[0,-14]} opacity={1} className="ow-tip" permanent={false}>
@@ -642,7 +642,7 @@ export function MapView({ auth }) {
 function onEachFeature(feature,layer) {
     const intel = countryIntel.find(c=>c.code===feature.properties.code)
     if(!intel){layer.options.interactive=false;return}
-    const e = ESC_GEO[intel.escalation]||ESC_GEO.WATCH
+    const e = ESC_GEO[intel.escalation]||ESC_GEO.NORMAL
     layer.on({
       mouseover:ev=>{
         ev.target.setStyle({

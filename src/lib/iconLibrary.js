@@ -281,10 +281,11 @@ export function renderSvgString(id, color, size = 32, { state = null } = {}) {
 export function mkSiteIconHtml(id, color, size = 24, { state = null } = {}) {
   const safeId = (id || 'facility').toLowerCase()
   const col = color || STATE_COLORS[state] || STATE_COLORS.nominal
-  const svg = renderSvgString(safeId, col, size, { state })
+  const finalCol = safeId === 'airbase' ? '#39e0a0' : (safeId === 'naval' || safeId === 'port') ? '#50a0e8' : col
+  const svg = renderSvgString(safeId, finalCol, size, { state })
   const isPulse = state === 'critical'
   const pulseRing = isPulse
-    ? `<span style="position:absolute;inset:1px;border:1px solid ${col};border-radius:50%;opacity:0.35;pointer-events:none;"></span>`
+    ? `<span style="position:absolute;inset:1px;border:1px solid ${finalCol};border-radius:50%;opacity:0.35;pointer-events:none;"></span>`
     : ''
   return `<span style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">${pulseRing}${svg}</span>`
 }
@@ -295,8 +296,9 @@ export function mkSiteIconHtml(id, color, size = 24, { state = null } = {}) {
 export function InlineIcon({ id, status, size = 16 }) {
   const safeId = (id || 'facility').toLowerCase()
   const col = STATE_COLORS[status] || STATE_COLORS.nominal
+  const finalCol = safeId === 'airbase' ? '#39e0a0' : (safeId === 'naval' || safeId === 'port') ? '#50a0e8' : col
   return React.createElement('div', {
     dangerouslySetInnerHTML: { __html: SITE_ICONS[safeId] || SITE_ICONS['facility'] },
-    style: { width: size, height: size, flexShrink: 0, color: col, lineHeight: 0, display: 'inline-block' },
+    style: { width: size, height: size, flexShrink: 0, color: finalCol, lineHeight: 0, display: 'inline-block' },
   })
 }
