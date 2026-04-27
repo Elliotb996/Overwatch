@@ -11,7 +11,7 @@ const _statusToState = { ACTIVE:'nominal', DAMAGED:'elevated', DESTROYED:'critic
 // options.flightCount:  integer — renders a blue flight-arrival badge (+N ✈)
 // options.className:    string  — added to the outer Leaflet marker div (for CSS targeting)
 export function mkSiteIcon(iconId, status, options = {}) {
-  const { clusterCount = 0, flightCount = 0, className = '' } = typeof options === 'object' ? options : {}
+  const { clusterCount = 0, className = '' } = typeof options === 'object' ? options : {}
   const safeId = (iconId || 'facility').toLowerCase()
   const state = _statusToState[status] || 'dormant'
   const color = STATE_COLORS[state]
@@ -21,8 +21,6 @@ export function mkSiteIcon(iconId, status, options = {}) {
   if (id === 'naval' || id === 'port') finalColor = '#50a0e8'
   const badge = clusterCount > 1
     ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${finalColor};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">${clusterCount}</div>`
-    : flightCount > 0
-    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:22px;height:13px;padding:0 3px;background:#50a0e8;color:#07090b;font-family:'Share Tech Mono',monospace;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${flightCount}✈</div>`
     : ''
   return L.divIcon({
     className,
