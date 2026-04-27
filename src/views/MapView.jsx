@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { useFlights } from '../hooks/useFlights'
 import { useAssets } from '../hooks/useAssets'
 import { supabase } from '../lib/supabase'
-import { mkIcon, mkTrackBlock, mkSiteIcon, mkPulseIcon, mkClusterIcon, PULSE_COLS } from '../lib/mapIcons'
+import { mkIcon, mkTrackBlock, mkSiteIcon, mkPulseIcon, PULSE_COLS } from '../lib/mapIcons'
 import { InlineIcon } from '../lib/iconLibrary'
 import { StrikePulseSidebar } from '../components/StrikePulseSidebar'
 
@@ -391,7 +391,7 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
               <React.Fragment key={cl.id}>
                 {/* Ghost centre marker */}
                 <Marker position={[cl.lat, cl.lng]}
-                  icon={mkClusterIcon(cl.assets.length, maxStatus)}
+                  icon={mkSiteIcon('airbase', maxStatus || 'ACTIVE', cl.assets.length)}
                   eventHandlers={{ click: (e) => { L.DomEvent.stopPropagation(e); setExpandedId(null) } }} />
                 {/* Spread markers */}
                 {cl.assets.map((a, i) => {
@@ -427,7 +427,7 @@ function AirbaseClusterLayer({ assets, flights, country, selectAsset, setAbmAsse
           // Collapsed cluster — single multi-base marker
           return (
             <Marker key={cl.id} position={[cl.lat, cl.lng]}
-              icon={mkClusterIcon(cl.assets.length, maxStatus)}
+              icon={mkSiteIcon('airbase', maxStatus || 'ACTIVE', cl.assets.length)}
               eventHandlers={{ click: (e) => {
                 L.DomEvent.stopPropagation(e)
                 if (CLUSTER_MODE === 'zoom') {

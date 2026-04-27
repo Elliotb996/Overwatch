@@ -28,33 +28,6 @@ const ESC_COLORS = {
 const SITE_STATUS_COL = { DESTROYED:C.r, DAMAGED:C.a, ACTIVE:C.g, UNKNOWN:C.t2 }
 
 
-// ── mkStrikeCluster — count badge for clustered strikes (low zoom) ──
-// Worst-status wins: if any DESTROYED in cluster → red, else DAMAGED → amber, else grey
-function mkStrikeCluster(count, worstStatus) {
-  const col = SITE_STATUS_COL[worstStatus] || C.r
-  const size = 26
-  return L.divIcon({
-    className: '',
-    iconSize: [size, size],
-    iconAnchor: [size/2, size/2],
-    html: `<div style="position:relative;width:${size}px;height:${size}px">
-      <svg viewBox="0 0 20 20" width="${size}" height="${size}" style="display:block;overflow:visible">
-        <rect x="3" y="3" width="14" height="14" fill="rgba(7,9,11,0.85)" stroke="${col}" stroke-width="1.2"/>
-        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
-              stroke="${col}" stroke-width="1" fill="none"/>
-        <line x1="10" y1="5" x2="10" y2="15" stroke="${col}" stroke-width="0.8" opacity="0.5"/>
-        <line x1="5" y1="10" x2="15" y2="10" stroke="${col}" stroke-width="0.8" opacity="0.5"/>
-        <circle cx="10" cy="10" r="2.5" fill="${col}"/>
-      </svg>
-      <div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;
-        background:${col};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;
-        font-weight:700;display:flex;align-items:center;justify-content:center;
-        border:1px solid #07090b;box-sizing:border-box;pointer-events:none">${count}</div>
-    </div>`,
-  })
-}
-
-
 function TierGate({required,current,children}) {
   const TO={free:0,analyst:1,premium:2,admin:3,owner:4}
   if((TO[current]||0)>=(TO[required]||0)) return children
@@ -468,7 +441,7 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
           return (
             <div key={cl.id}>
               <Marker position={[cl.lat, cl.lng]}
-                icon={mkStrikeCluster(cl.sites.length, worst)}
+                icon={mkSiteIcon(cl.sites[0]?.site_type || cl.sites[0]?.site_category || 'facility', worst, cl.sites.length)}
                 eventHandlers={{click:(e)=>{L.DomEvent.stopPropagation(e); setExpandedId(null)}}} />
               {cl.sites.map((s, i) => {
                 const pos = positions[i] || {lat:cl.lat, lng:cl.lng}
@@ -492,7 +465,7 @@ function StrikeSiteClusterLayer({ sites, selSite, setSelSite, onExpand }) {
 
         return (
           <Marker key={cl.id} position={[cl.lat, cl.lng]}
-            icon={mkStrikeCluster(cl.sites.length, worst)}
+            icon={mkSiteIcon(cl.sites[0]?.site_type || cl.sites[0]?.site_category || 'facility', worst, cl.sites.length)}
             eventHandlers={{click:(e)=>{
               L.DomEvent.stopPropagation(e)
               const pos = getSiteFanPositions(cl.lat, cl.lng, cl.sites.length, map)

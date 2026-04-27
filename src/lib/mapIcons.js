@@ -8,7 +8,7 @@ const _statusToState = { ACTIVE:'nominal', DAMAGED:'elevated', DESTROYED:'critic
 // iconId: any key from ICON_IDS (missile, nuclear, radar, etc.) — falls back to 'facility'.
 // status: ACTIVE | DAMAGED | DESTROYED | UNKNOWN
 // alerts: integer badge count (0 = no badge)
-export function mkSiteIcon(iconId, status, alerts = 0) {
+export function mkSiteIcon(iconId, status, count = 0) {
   const safeId = (iconId || 'facility').toLowerCase()
   const state = _statusToState[status] || 'dormant'
   const color = STATE_COLORS[state]
@@ -16,8 +16,8 @@ export function mkSiteIcon(iconId, status, alerts = 0) {
   let finalColor = color
   if (id === 'airbase') finalColor = '#39e0a0'
   if (id === 'naval' || id === 'port') finalColor = '#50a0e8'
-  const badge = alerts > 0
-    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${finalColor};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">+${alerts}</div>`
+  const badge = count > 0
+    ? `<div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${finalColor};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box;pointer-events:none">${count}</div>`
     : ''
   return L.divIcon({
     className: '',
@@ -110,28 +110,6 @@ export function mkPulseIcon(count, recency = 'old') {
         <circle cx="10" cy="10" r="2" fill="${col}"/>
       </svg>
       <div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;background:${col};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #07090b;box-sizing:border-box">${count}</div>
-    </div>`,
-  })
-}
-
-// Cluster badge: corner-ticked square + asset count chip. Color follows max status in cluster.
-export function mkClusterIcon(count, maxStatus) {
-  const col = maxStatus === 'SURGE' ? '#e85040' : maxStatus === 'ELEVATED' ? '#f0a040' : '#39e0a0'
-  return L.divIcon({
-    className: '',
-    iconSize:  [28, 28],
-    iconAnchor:[14, 14],
-    html: `<div style="position:relative;width:28px;height:28px;">
-      <svg viewBox="0 0 20 20" width="28" height="28" style="display:block;overflow:visible">
-        <rect x="4" y="4" width="12" height="12" fill="${col}12" stroke="${col}" stroke-width="1"/>
-        <path d="M1,1 L4,1 M1,1 L1,4 M19,1 L16,1 M19,1 L19,4 M1,19 L4,19 M1,19 L1,16 M19,19 L16,19 M19,19 L19,16"
-              stroke="${col}" stroke-width="1" fill="none"/>
-        <circle cx="10" cy="10" r="1.6" fill="${col}"/>
-      </svg>
-      <div style="position:absolute;top:-8px;right:-10px;min-width:18px;height:13px;padding:0 3px;
-        background:${col};color:#07090b;font-family:'Share Tech Mono',monospace;font-size:8px;
-        font-weight:700;display:flex;align-items:center;justify-content:center;
-        border:1px solid #07090b;box-sizing:border-box">${count}</div>
     </div>`,
   })
 }
